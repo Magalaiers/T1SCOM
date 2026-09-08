@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description"> 
+    <link rel="stylesheet" href="style.css">
+    <link>
+    <title>MM PitWall - Comparador de Pilotos</title>
+</head>
+<body>
+    <header>
+        <div class="header">
+            <h1>MM PitWall</h1>
+            <nav class="main_nav">
+                <ul>
+                    <li><a href="#comparador">Comparador</a></li>
+                    <li><a href="">Equipes</a></li>
+                    <li><a href="">Ajuda</a></li>
+                </ul>
+            </nav>
+        </div>
+    </header>
+
+    <main class="container">
+        <section id="comparador">
+            <h2 id="titulo_comparador">Comparador de Pilotos</h2>
+            <p>Selecione dois pilotos do grid para comparar seus atributos.</p>
+
+            <div class="seletor_grid">
+                <div class="form_group">
+                    <label for="select_p1">Primeiro Piloto:</label>
+                    <select name="piloto1" id="select_p1">
+                        <option value="">Selecione um piloto...</option>
+                    </select>
+                </div>
+
+                <div class="form_group">
+                    <label for="select_p2">Segundo Piloto:</label>
+                    <select name="piloto2" id="select_p2">
+                        <option value="">Selecione um piloto...</option>
+                    </select>
+                </div>
+            </div>
+
+            <div id="painel_comparativo" class="comparador_resultado">
+                <p>Selecione ambos os piloto para visualizar a comparação lado a lado.</p>
+            </div>
+        </section>
+
+        
+    </main>
+</body>
+</html>
