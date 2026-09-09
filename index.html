@@ -48,7 +48,185 @@
             </div>
         </section>
 
-        
+        <section id="grid_catalogo">
+            <div class="catalogo_header">
+                <h2 id="titulo_catalogo">Catálogo de Pilotos</h2>
+
+                <aside class="catalogo_toolbar" role="search">
+                    <div class="filtro_item">
+                        <label for="busca_piloto">Buscar Piloto:</label>
+                        <input type="search" id="busca_piloto" placeholder="Nome ou país..." autocomplete="off" >
+                    </div>
+
+                    <div class="filtro_item">
+                        <label for="filtro_equipe">Equipe:</label>
+                        <select id="filtro_equipe">
+                            <option value="todas">Todas as Equipes</option>
+                        </select>
+                    </div>
+
+                    <div class="filtro_item">
+                        <label for="ordenar_piloto">Ordenar por:</label>
+                        <select id="ordenar_piloto">
+                            <option value="rating_desc">Maior Habilidade</option>
+                            <option value="potential_desc">Maior Potencial</option>
+                            <option value="salary_asc">Menor Salário</option>
+                            <option value="salary_desc">Maior Salário</option>
+                            <option value="nome_asc">Nome (A-Z)</option>
+                        </select>
+                    </div>
+                </aside>
+            </div>
+
+            <div id="cards_container" class="cards_grid">
+
+            </div>
+
+            <nav id="paginacao_container" class="paginacao_nav">
+
+            </nav>
+        </section>
+
+        <section id="guia_ajuda">
+            <div>
+                <h2 id="titulo_guia">Sobre o Motorsport Manager e guia dos atributos</h2>
+                <p>Perdido em o que cada são esse monte de comparações? Aqui tiraremos algumas dúvidas sobre isso, confira abaixo!</p>
+            </div>
+
+            <div class="campeonatos">
+
+                <div class="single_seater">
+                    <h3 class="campeonatos_titulo">Monopostos (Single Seaters)</h3>
+                    <div class="campeonatos_grid">
+                        <article class="card_tier1">
+                            <header class="card_campeonato_header">
+                                <span class="badge_tier">Tier 1</span>
+                                <h4>World Motorsport Championship</h4>
+                            </header>
+                            <p>A elite do automobilismo. Aqui você tem total liberdade de construir partes do seu carro, corridas mais longas e sem reabastecimento, trazendo um desafio de 
+                                gerenciamento de combustível. O campeonato abrange 16 etapas em circuitos desafioadores no mundo todo e como é o principal, tem o maior pagamento para equipes no fim da temporada. 
+                                O último colocado (10º) será rebaixado para a Asia-Pacific Super Cup</p>
+                        </article>
+
+                        <article class="card_tier2">
+                            <header class="card_campeonato_header">
+                                <span class="badge_tier">Tier 2</span>
+                                <h4>Asia-Pacific Super Cup</h4>
+                            </header>
+                            <p>A série intermediaria dos monopostos. Possui corridas na Ásia, Australia e Americas distribuídas em 11 corridas. Com duração mediana e reabastecimento, a gestão continua importante devido às restrições na equipe de pitstop. A única parte comum para todas as equipes é o motor, que tem seu desenvolvimento bloqueado. Pontos são distribuídos aos 6 primeiros apenas, reforçando a estratégia. A equipe primeira colocada ganha a promoção para a elite e o último é rebaixado para a European Racing Series.</p>
+                        </article>
+                        
+                        <article class="card_tier3">
+                            <header class="card_campeonato_header">
+                                <span class="badge_tier">Tier 3</span>
+                                <h4>European Racing Series</h4>
+                            </header>
+                            <p>A cetegoria de entrada dos monopostos. Com distâncias menores e corridas mais curtas pelas 10 etapas ao redor da Europa, o desafio se encontra em ter uma boa base para a promoção de categoria, que acontece ao primeiro colocado. Com reabastecimentos, desenvolvimento proibido de asas dianteiras e traseiras e pontos para todos, o caos está instaurado e qualquer resultado é possível.</p>
+                        </article>
+                    </div>
+                </div>
+                
+                <div class="gt">
+                    <h3 class="campeonatos_titulo">Grand Tourer (GT)</h3>
+                    <div class="campeonatos_grid">
+                        <article class="card_tier1">
+                            <header class="card_campeonato_header">
+                                <span class="badge_tier">Tier 1</span>
+                                <h4>International GT Championship</h4>
+                            </header>
+                            <p>A categoria do topo dos GT. Com desenvolvimento permitido do carro inteiro e reabastecimento, além de sistemas de recuperação de energia, promovem a melhor das competições dos carros GT.</p>
+                        </article>
+                        <article class="card_tier2">
+                            <header class="card_campeonato_header">
+                                <span class="badge_tier">Tier 2</span>
+                                <h4>GT Challenger Series</h4>
+                            </header>
+                            <p>A categoria amadora dos GT. Aqui as corridas são menores, mas ainda abordam o caos da categoria principal. O desenvolvimento do spoiler é proibido, no entanto os pontos são distribuídos para todos.</p>
+                        </article>
+                    </div>
+                </div>
+
+                <div class="endurance">
+                    <h3 class="campeonatos_titulo">Resistência (Endurance)</h3>
+                    <div class="campeonatos_grid">
+                        <article class="card_tier1">
+                            <header class="card_campeonato_header">
+                                <span class="badge_tier">Tier 1</span>
+                                <h4>International Endurance Cup (Class A)</h4>
+                            </header>
+                            <p>O ápice dos protótipos mais rápidos do mundo. Com tamanho prestígio, a única proibição é a de assistencia de pilotos, exigindo 6 pilotos de ponta na equipe.</p>
+                        </article>
+                        <article class="card_tier2">
+                            <header class="card_campeonato_header">
+                                <span class="badge_tier">Tier 2</span>
+                                <h4>International Endurance Cup (Class B)</h4>
+                            </header>
+                            <p>Uma versão amadora do campeonato de resistência. Para adicionar caos aos carros mais rápidos do mundo, a classe B chega para desafiar os classe A, mas com notável diferença de desempenho.</p>
+                        </article>
+                    </div>
+                </div>
+                
+            </div>
+
+            <div class="atributos">
+                <h3>Guia de Atributos dos Pilotos</h3>
+                <dl class="atributos_grid">
+                    <div class="atributos_item">
+                        <dt>Frenagem</dt>
+                        <dd>"Impacta o quão tarde o piloto freia em uma curva e o quão propenso ele é a travar os pneus."</dd>
+                    </div>
+                    <div class="atributos_item">
+                        <dt>Curva</dt>
+                        <dd>"Impacta a velocidade nas curvas e a precisão do piloto ao chegar na linha de corrida."</dd>
+                    </div>
+                    <div class="atributos_item">
+                        <dt>Suavidade</dt>
+                        <dd>"Impacta as taxas de desgaste dos pneus. Um piloto mais suave manterá os pneus em melhores condições."</dd>
+                    </div>
+                    <div class="atributos_item">
+                        <dt>Ultrapassagem</dt>
+                        <dd>"Isso impacta a quantidade de possibilidades de ultrapassagem que um piloto pode ver, e também sua habilidade em fazer uma ultrapassagem se manter."</dd>
+                    </div>
+                    <div class="atributos_item">
+                        <dt>Consistência</dt>
+                        <dd>"Impacta a variabilidade dos tempos de volta de um piloto (ex. um piloto menos consistente pode fazer ótimas voltas, mas não necessariamente fará isso de forma consistente)"</dd>
+                    </div>
+                    <div class="atributos_item">
+                        <dt>Adaptabilidade</dt>
+                        <dd>"Um motorista mais adaptável poderá entrar em qualquer carro e se sentir em casa. Essa estatística influencia a confiança do piloto com o carro quando há várias configurações e mudanças de peças sendo feitas." Também afeta a habilidade do motorista em condições climáticas variáveis. Especialmente em pneus intermediários.</dd>
+                    </div>
+                    <div class="atributos_item">
+                        <dt>Preparo Físico</dt>
+                        <dd>"Impacta como o nível de desempenho do piloto cai durante uma corrida. Um piloto menos apto pode ver seu desempenho cair mais nas fases finais da corrida."</dd>
+                    </div>
+                    <div class="atributos_item">
+                        <dt>Análise</dt>
+                        <dd>"Impacta o quão úteis e precisos são os níveis de feedback do piloto durante um fim de semana de corrida."</dd>
+                    </div>
+                    <div class="atributos_item">
+                        <dt>Concentração</dt>
+                        <dd>"Impacta a mentalidade do motorista e suas chances de cometer um erro."</dd>
+                    </div>
+                    <div class="atributos_item">
+                        <dt>Negociabilidade</dt>
+                        <dd>Ajuda na contratação de patrocínios lucrativos.</dd>
+                    </div>
+                    <div class="atributos_item">
+                        <dt>Série Pilotável</dt>
+                        <dd>Informa as categorias que o piloto prefere dirigir.</dd>
+                    </div>
+                </dl>
+
+            </div>
+        </section>
     </main>
+
+    <footer>
+        <div class="footer_content">
+            <p>&copy; 2026 MM PitWall. Dados inspirados no jogo de simulação e estratégia Motorsport Manager.</p>
+        </div>
+    </footer>
+
+    <script src="script.js"></script>
 </body>
 </html>
