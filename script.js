@@ -15,10 +15,10 @@ const ATRIBUTOS_CONFIG = [
   { chave: 'suavidade', rotulo: 'Suavidade', alias: ['smoothness', 'suavidade'] },
   { chave: 'ultrapassagem', rotulo: 'Ultrapassagem', alias: ['overtaking', 'ultrapassagem'] },
   { chave: 'consistencia', rotulo: 'Consistência', alias: ['consistency', 'consistencia'] },
-  { chave: 'adaptabilidade', rotulo: 'Adaptação', alias: ['adaptability', 'adaptabilidade', 'adaptacao'] },
+  { chave: 'adaptabilidade', rotulo: 'Adaptabilidade', alias: ['adaptability', 'adaptabilidade', 'adaptacao'] },
   { chave: 'preparo_fisico', rotulo: 'Preparo Físico', alias: ['fitness', 'preparo_fisico', 'fisico'] },
-  { chave: 'feedback', rotulo: 'Feedback', alias: ['feedback'] },
-  { chave: 'foco', rotulo: 'Foco', alias: ['focus', 'foco'] }
+  { chave: 'analise', rotulo: 'Análise', alias: ['feedback', 'analise'] },
+  { chave: 'concentracao', rotulo: 'Concentração', alias: ['focus', 'concentracao'] }
 ];
 
 document.addEventListener('DOMContentLoaded', async () => {
@@ -468,7 +468,7 @@ function renderizarPainelComparativo(p1, p2) {
           <td><strong>${p2.pay_driver ? '<span class="tag_sim_verde">Sim</span>' : 'Não'}</strong></td>
         </tr>
         <tr>
-          <th scope="row">Apelo Comercial</th>
+          <th scope="row">Negociabilidade</th>
           <td><strong>${p1.marketability || '0%'}</strong></td>
           <td><strong>${p2.marketability || '0%'}</strong></td>
         </tr>
