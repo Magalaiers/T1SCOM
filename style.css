@@ -134,12 +134,15 @@ section p {
     padding: 1.5rem;
     border-radius: var(--radius);
     border: 1px solid var(--border);
+    width: 100%;
   }
 
 .form_group {
     display: flex;
     flex-direction: column;
     gap: 0.5rem;
+    min-width: 0;
+    width: 100%;
 }
 
 label {
@@ -151,6 +154,9 @@ label {
 }
 
 select, input[type="search"] {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
     background-color: var(--bg-surface);
     color: var(--text-main);
     border: 1px solid var(--border);
@@ -450,4 +456,284 @@ input[type="search"]:focus {
     font-weight: 700;
     color: var(--text-main);
     font-variant-numeric: tabular-nums;
+}
+
+/*nav*/
+.paginacao_nav {
+    margin-top: 2rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.paginacao_wrapper {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0.5rem;
+}
+
+.pag_numeros_container {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+}
+
+.paginacao_btn, 
+.pag_num_btn {
+    background-color: var(--bg-card);
+    color: var(--text-main);
+    border: 1px solid var(--border);
+    padding: 0.5rem 0.85rem;
+    border-radius: var(--radius);
+    font-size: 0.88rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background-color 0.2s, border-color 0.2s, opacity 0.2s;
+}
+
+.paginacao_btn:hover:not(:disabled), 
+.pag_num_btn:hover:not(.is_active) {
+  background-color: var(--bg-surface);
+  border-color: var(--accent);
+}
+
+.pag_num_btn.is_active {
+  background-color: var(--accent);
+  border-color: var(--accent);
+  color: #ffffff;
+  cursor: default;
+}
+
+.paginacao_btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.pag_reticencias {
+  color: var(--text-muted);
+  padding: 0 0.25rem;
+}
+
+.paginacao_subinfo, 
+.paginacao_info_unica {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.paginacao_subinfo strong, 
+.paginacao_info_unica strong {
+  color: var(--text-main);
+}
+
+/*guia*/
+#guia_ajuda {
+    display: flex;
+    flex-direction: column;
+    gap: 2.5rem;
+}
+  
+#titulo_guia {
+    font-size: 1.35rem;
+    font-weight: 700;
+    color: var(--text-main);
+    margin-bottom: 0.35rem;
+}
+  
+#guia_ajuda > div:first-child p {
+    color: var(--text-muted);
+    font-size: 0.95rem;
+    max-width: 70ch;
+}
+
+.campeonatos {
+    display: flex;
+    flex-direction: column;
+    gap: 2rem;
+}
+  
+.campeonatos_titulo {
+    font-size: 1.15rem;
+    font-weight: 700;
+    color: var(--text-main);
+    margin-bottom: 1rem;
+    padding-bottom: 0.4rem;
+    border-bottom: 2px solid var(--border);
+}
+  
+.campeonatos_grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1.25rem;
+}
+
+.campeonatos_grid article {
+    background-color: var(--bg-card);
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    padding: 1.25rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    border-top: 4px solid var(--border);
+    transition: transform 0.2s ease, border-color 0.2s ease;
+}
+  
+.campeonatos_grid article:hover {
+    transform: translateY(-2px);
+    border-color: var(--accent);
+}
+
+.card_tier1 { border-top-color: var(--accent) !important; }
+.card_tier2 { border-top-color: var(--accent-gold) !important; }
+.card_tier3 { border-top-color: var(--accent-blue) !important; }
+
+.card_campeonato_header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.badge_tier {
+    font-size: 0.75rem;
+    font-weight: 700;
+    padding: 0.2rem 0.5rem;
+    border-radius: 4px;
+    background-color: var(--bg-surface);
+    color: var(--text-main);
+    border: 1px solid var(--border);
+    text-transform: uppercase;
+}
+  
+.card_campeonato_header h4 {
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: var(--text-main);
+}
+  
+.campeonatos_grid article p {
+    font-size: 0.88rem;
+    color: var(--text-muted);
+    line-height: 1.55;
+    margin-bottom: 0;
+}
+
+.atributos {
+    background-color: var(--bg-card);
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    padding: 1.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+}
+
+.atributos h3 {
+    font-size: 1.15rem;
+    font-weight: 700;
+    color: var(--accent-gold);
+}
+  
+.atributos_grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1rem;
+}
+
+.atributos_item {
+    background-color: var(--bg-surface);
+    padding: 0.85rem 1rem;
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+}
+  
+.atributos_item dt {
+    font-weight: 700;
+    color: var(--text-main);
+    font-size: 0.95rem;
+    margin-bottom: 0.35rem;
+    border-left: 3px solid var(--accent);
+    padding-left: 0.5rem;
+}
+  
+.atributos_item dd {
+    color: var(--text-muted);
+    font-size: 0.86rem;
+    line-height: 1.5;
+    margin: 0;
+}
+
+/*figure*/
+.jogo_arte {
+    margin: 1.5rem 0 2rem 0;
+    text-align: center;
+}
+
+.jogo_arte img {
+    width: 100%;
+    max-width: 800px;
+    height: auto;
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    display: block;
+    margin: 0 auto;
+}
+
+.jogo_arte figcaption {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    margin-top: 0.6rem;
+    font-style: italic;
+    max-width: 70ch;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+/*footer*/
+footer {
+    background-color: var(--bg-surface);
+    border-top: 1px solid var(--border);
+    padding: 1.75rem 0;
+    text-align: center;
+    color: var(--text-muted);
+    font-size: 0.875rem;
+}
+
+/*dimensionamento*/
+@media (min-width: 600px) {
+    .seletores_grid {
+        grid-template-columns: 1fr 1fr;
+    }
+
+    .cards_grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .glossario_grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@media (min-width: 768px) {
+    .disciplina_grupo.single_seater .campeonatos_grid {
+        grid-template-columns: repeat(3, 1fr);
+    }
+
+    .disciplina_grupo.gt .campeonatos_grid,
+    .disciplina_grupo.endurance .campeonatos_grid {
+        grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (min-width: 1024px) {
+    .cards_grid {
+        grid-template-columns: repeat(3, 1fr);
+    }
+
+    .glossario_grid {
+        grid-template-columns: repeat(3, 1fr);
+    }
 }

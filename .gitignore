@@ -1,0 +1,13 @@
+# Arquivos do editor e do sistema operacional
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Caches e arquivos temporários do Python
+__pycache__/
+*.pyc
+
+# Planilhas pesadas (opcional, se quiser manter só os CSVs ou o JSON no Git)
+*.xlsx
+*.xls
