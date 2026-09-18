@@ -403,92 +403,133 @@ function configurarEventosComparacao() {
 }
 
 function renderizarPainelComparativo(p1, p2) {
-  const painel = document.getElementById('painel_comparativo');
-
-  const r1 = calcularEstrelasAtuais(p1);
-  const r2 = calcularEstrelasAtuais(p2);
-  const pot1 = calcularEstrelasPotencial(p1, r1);
-  const pot2 = calcularEstrelasPotencial(p2, r2);
-
-  const comparar = (v1, v2) => ({
-    c1: Number(v1) > Number(v2) ? 'is_winner' : (Number(v1) < Number(v2) ? 'is_loser' : ''),
-    c2: Number(v2) > Number(v1) ? 'is_winner' : (Number(v2) < Number(v1) ? 'is_loser' : '')
-  });
-
-  const compararIdade = (i1, i2) => ({
-    c1: Number(i1) < Number(i2) ? 'is_winner' : (Number(i1) > Number(i2) ? 'is_loser' : ''),
-    c2: Number(i2) < Number(i1) ? 'is_winner' : (Number(i2) > Number(i1) ? 'is_loser' : '')
-  });
-
-  const resRating = comparar(r1, r2);
-  const resPot = comparar(pot1, pot2);
-  const resIdade = compararIdade(p1.idade || 25, p2.idade || 25);
-
-  const linhasAtributos = ATRIBUTOS_CONFIG.map(cfg => {
-    const v1 = obterValorAtributo(p1, cfg);
-    const v2 = obterValorAtributo(p2, cfg);
-    const res = comparar(v1, v2);
-    return `
-      <tr>
-        <th scope="row">${cfg.rotulo}</th>
-        <td class="${res.c1}"><strong>${v1}</strong></td>
-        <td class="${res.c2}"><strong>${v2}</strong></td>
-      </tr>
+    const painel = document.getElementById('painel_comparativo');
+  
+    const r1 = calcularEstrelasAtuais(p1);
+    const r2 = calcularEstrelasAtuais(p2);
+    const pot1 = calcularEstrelasPotencial(p1, r1);
+    const pot2 = calcularEstrelasPotencial(p2, r2);
+  
+    // Maior valor vence (▲)
+    const comparar = (v1, v2) => ({
+      c1: Number(v1) > Number(v2) ? 'is_winner' : (Number(v1) < Number(v2) ? 'is_loser' : ''),
+      c2: Number(v2) > Number(v1) ? 'is_winner' : (Number(v2) < Number(v1) ? 'is_loser' : '')
+    });
+  
+    // Menor valor é vantajoso (▼) — idade mais jovem
+    const compararMenor = (v1, v2) => ({
+      c1: Number(v1) < Number(v2) ? 'is_winner_down' : (Number(v1) > Number(v2) ? 'is_loser' : ''),
+      c2: Number(v2) < Number(v1) ? 'is_winner_down' : (Number(v2) > Number(v1) ? 'is_loser' : '')
+    });
+  
+    // Comparações de perfil
+    const resIdade = compararMenor(p1.idade || 25, p2.idade || 25);
+  
+    const neg1 = parseFloat(String(p1.negociabilidade || p1.marketability || '0').replace('%', '')) || 0;
+    const neg2 = parseFloat(String(p2.negociabilidade || p2.marketability || '0').replace('%', '')) || 0;
+    const resNeg = comparar(neg1, neg2);
+  
+    // Comparações de estrelas
+    const resRating = comparar(r1, r2);
+    const resPot = comparar(pot1, pot2);
+  
+    // Comparações dos atributos técnicos
+    const linhasAtributos = ATRIBUTOS_CONFIG.map(cfg => {
+      const v1 = obterValorAtributo(p1, cfg);
+      const v2 = obterValorAtributo(p2, cfg);
+      const res = comparar(v1, v2);
+      return `
+        <tr>
+          <th scope="row">${cfg.rotulo}</th>
+          <td class="${res.c1}"><strong>${v1}</strong></td>
+          <td class="${res.c2}"><strong>${v2}</strong></td>
+        </tr>
+      `;
+    }).join('');
+  
+    painel.innerHTML = `
+      <table class="comparacao_tabela" aria-label="Comparação direta entre ${p1.nome} e ${p2.nome}">
+        <thead>
+          <tr>
+            <th scope="col" style="width: 34%;">Métrica / Atributo</th>
+            <th scope="col" style="width: 33%;">${p1.nome}</th>
+            <th scope="col" style="width: 33%;">${p2.nome}</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <th scope="row">Equipe</th>
+            <td><span class="tabela_tag">${obterNomeEquipe(p1.equipe_id)}</span></td>
+            <td><span class="tabela_tag">${obterNomeEquipe(p2.equipe_id)}</span></td>
+          </tr>
+          <tr>
+            <th scope="row">Idade</th>
+            <td class="${resIdade.c1}"><strong>${p1.idade || 25} anos</strong></td>
+            <td class="${resIdade.c2}"><strong>${p2.idade || 25} anos</strong></td>
+          </tr>
+          <tr>
+            <th scope="row">Preferência de Série</th>
+            <td><span class="tabela_tag">${p1.series_preference || 'Any'}</span></td>
+            <td><span class="tabela_tag">${p2.series_preference || 'Any'}</span></td>
+          </tr>
+          <tr>
+            <th scope="row">Piloto Pagante</th>
+            <td><strong>${p1.pay_driver ? '<span class="tag_sim_verde">Sim</span>' : 'Não'}</strong></td>
+            <td><strong>${p2.pay_driver ? '<span class="tag_sim_verde">Sim</span>' : 'Não'}</strong></td>
+          </tr>
+          <tr>
+            <th scope="row">Negociabilidade</th>
+            <td class="${resNeg.c1}"><strong>${p1.negociabilidade || p1.marketability || '0%'}</strong></td>
+            <td class="${resNeg.c2}"><strong>${p2.negociabilidade || p2.marketability || '0%'}</strong></td>
+          </tr>
+          <tr>
+            <th scope="row">Salário Anual</th>
+            <td>${formatarSalario(p1.salario_anual)}</td>
+            <td>${formatarSalario(p2.salario_anual)}</td>
+          </tr>
+          <tr>
+            <th scope="row">Habilidade Atual</th>
+            <td class="${resRating.c1}">${renderizarEstrelasVisual(r1)}</td>
+            <td class="${resRating.c2}">${renderizarEstrelasVisual(r2)}</td>
+          </tr>
+          <tr>
+            <th scope="row">Potencial Máximo</th>
+            <td class="${resPot.c1}">${renderizarEstrelasVisual(pot1)}</td>
+            <td class="${resPot.c2}">${renderizarEstrelasVisual(pot2)}</td>
+          </tr>
+          ${linhasAtributos}
+        </tbody>
+      </table>
     `;
-  }).join('');
+  }
 
-  painel.innerHTML = `
-    <table class="comparacao_tabela" aria-label="Comparação direta entre ${p1.nome} e ${p2.nome}">
-      <thead>
-        <tr>
-          <th scope="col" style="width: 34%;">Métrica / Atributo</th>
-          <th scope="col" style="width: 33%;">${p1.nome}</th>
-          <th scope="col" style="width: 33%;">${p2.nome}</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr>
-          <th scope="row">Equipe</th>
-          <td><span class="tabela_tag">${obterNomeEquipe(p1.equipe_id)}</span></td>
-          <td><span class="tabela_tag">${obterNomeEquipe(p2.equipe_id)}</span></td>
-        </tr>
-        <tr>
-          <th scope="row">Idade</th>
-          <td class="${resIdade.c1}"><strong>${p1.idade || 25} anos</strong></td>
-          <td class="${resIdade.c2}"><strong>${p2.idade || 25} anos</strong></td>
-        </tr>
-        <tr>
-          <th scope="row">Preferência de Série</th>
-          <td><span class="tabela_tag">${p1.series_preference || 'Any'}</span></td>
-          <td><span class="tabela_tag">${p2.series_preference || 'Any'}</span></td>
-        </tr>
-        <tr>
-          <th scope="row">Piloto Pagante</th>
-          <td><strong>${p1.pay_driver ? '<span class="tag_sim_verde">Sim</span>' : 'Não'}</strong></td>
-          <td><strong>${p2.pay_driver ? '<span class="tag_sim_verde">Sim</span>' : 'Não'}</strong></td>
-        </tr>
-        <tr>
-          <th scope="row">Negociabilidade</th>
-          <td><strong>${p1.marketability || '0%'}</strong></td>
-          <td><strong>${p2.marketability || '0%'}</strong></td>
-        </tr>
-        <tr>
-          <th scope="row">Salário Anual</th>
-          <td>${formatarSalario(p1.salario_anual)}</td>
-          <td>${formatarSalario(p2.salario_anual)}</td>
-        </tr>
-        <tr>
-          <th scope="row">Habilidade Atual</th>
-          <td class="${resRating.c1}">${renderizarEstrelasVisual(r1)}</td>
-          <td class="${resRating.c2}">${renderizarEstrelasVisual(r2)}</td>
-        </tr>
-        <tr>
-          <th scope="row">Potencial Máximo</th>
-          <td class="${resPot.c1}">${renderizarEstrelasVisual(pot1)}</td>
-          <td class="${resPot.c2}">${renderizarEstrelasVisual(pot2)}</td>
-        </tr>
-        ${linhasAtributos}
-      </tbody>
-    </table>
-  `;
-}
+const secoesPagina = document.querySelectorAll('main > section');
+function atualizarMenuAtivo() {
+    const secoes = document.querySelectorAll('main > section');
+    const links = document.querySelectorAll('.main_nav a');
+    let secaoAtualId = '';
+  
+    secoes.forEach(secao => {
+      const topo = secao.offsetTop - 120; 
+      if (window.scrollY >= topo) {
+        secaoAtualId = secao.getAttribute('id');
+      }
+    });
+  
+    if (!secaoAtualId && secoes.length > 0) {
+      secaoAtualId = secoes[0].getAttribute('id');
+    }
+  
+    links.forEach(link => {
+      const ativo = link.getAttribute('href') === `#${secaoAtualId}`;
+      link.classList.toggle('is_active', ativo);
+      if (ativo) {
+        link.setAttribute('aria-current', 'location');
+      } else {
+        link.removeAttribute('aria-current');
+      }
+    });
+  }
+  
+  window.addEventListener('scroll', atualizarMenuAtivo);
+  document.addEventListener('DOMContentLoaded', atualizarMenuAtivo);
