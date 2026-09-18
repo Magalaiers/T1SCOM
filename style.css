@@ -26,6 +26,7 @@
   
 html {
     scroll-behavior: smooth;
+    scroll-padding-top: 5rem;
 }
 
 body {
@@ -48,8 +49,8 @@ body {
     outline-offset: 3px;
 }
 
-  /*header*/
-header {
+/*header*/
+body > header {
     background-color: var(--bg-surface);
     border-bottom: 2px solid var(--border);
     padding: 1rem 0;
@@ -110,6 +111,7 @@ section {
     padding: 1.75rem;
     border-radius: var(--radius);
     border: 1px solid var(--border);
+    scroll-margin-top: 5rem;
 }
   
 h2 {
@@ -559,7 +561,6 @@ input[type="search"]:focus {
     width: 100%;
 }
 
-
 .campeonatos {
     display: flex;
     flex-direction: column;
@@ -574,6 +575,16 @@ input[type="search"]:focus {
     padding-bottom: 0.4rem;
     border-bottom: 2px solid var(--border);
     margin-bottom: 0.4rem;
+}
+
+.card_campeonato_header {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    position: static;
+    background: transparent;
+    border: none;
+    padding: 0;
 }
 
 .card_campeonato_header h4 {

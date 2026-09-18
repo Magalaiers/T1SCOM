@@ -7,3 +7,8 @@ A partir da base de dados de pilotos (Drivers.csv) e de equipes (Teams.csv), o a
 
 Por esse motivo, o navegador bloqueia a abertura do arquivo com dois cliques ('file:///...') devido às regras de segurança de CORS, sendo necessário iniciar em um servidor local. 
 
+## Execução
+Abrir um prompt de comando escrevendo cmd no caminho da pasta de arquivos do projeto e escrever na tela:
+python -m http.server 8000
+E abrir no navegador o seguinte link:
+http://localhost:8000

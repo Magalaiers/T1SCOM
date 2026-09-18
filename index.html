@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description"> 
+    <meta name="description" content="Comparador de pilotos do jogo Motorsport Manager"> 
     <link rel="stylesheet" href="style.css">
     <title>MM PitWall - Comparador de Pilotos</title>
 </head>
@@ -11,7 +11,7 @@
     <header>
         <div class="header">
             <h1>MM PitWall</h1>
-            <nav class="main_nav">
+            <nav class="main_nav" aria-label="Navegação Pricipal">
                 <ul>
                     <li><a href="#comparador" class="nav_links">Comparador</a></li>
                     <li><a href="#grid_catalogo" class="nav_links">Equipes</a></li>
@@ -22,36 +22,36 @@
     </header>
 
     <main class="container">
-        <section id="comparador">
+        <section id="comparador" aria-labelledby="titulo_comparador">
             <h2 id="titulo_comparador">Comparador de Pilotos</h2>
             <p>Selecione dois pilotos do grid para comparar seus atributos.</p>
 
             <div class="seletores_grid">
                 <div class="form_group">
                     <label for="select_p1">Primeiro Piloto:</label>
-                    <select name="piloto1" id="select_piloto_1">
+                    <select name="piloto1" id="select_p1">
                         <option value="">Selecione um piloto...</option>
                     </select>
                 </div>
 
                 <div class="form_group">
                     <label for="select_p2">Segundo Piloto:</label>
-                    <select name="piloto2" id="select_piloto_2">
+                    <select name="piloto2" id="select_p2">
                         <option value="">Selecione um piloto...</option>
                     </select>
                 </div>
             </div>
 
-            <div id="painel_comparativo" class="comparador_resultado">
+            <div id="painel_comparativo" class="comparador_resultado" aria-live="polite">
                 <p>Selecione ambos os piloto para visualizar a comparação lado a lado.</p>
             </div>
         </section>
 
-        <section id="grid_catalogo">
+        <section id="grid_catalogo" aria-labelledby="titulo_catalogo">
             <div class="catalogo_header">
                 <h2 id="titulo_catalogo">Catálogo de Pilotos</h2>
 
-                <aside class="catalogo_toolbar" role="search">
+                <aside class="catalogo_toolbar" role="search" aria-label="Filtro e Busca de Pilotos">
                     <div class="filtro_item">
                         <label for="busca_piloto">Buscar Piloto:</label>
                         <input type="search" id="busca_piloto" placeholder="Nome ou país..." autocomplete="off" >
@@ -81,12 +81,12 @@
 
             </div>
 
-            <nav id="paginacao_container" class="paginacao_nav">
+            <nav id="paginacao_container" class="paginacao_nav" aria-label="Paginação do Catálogo">
 
             </nav>
         </section>
 
-        <section id="guia_ajuda">
+        <section id="guia_ajuda" aria-labelledby="titulo_guia">
             <div class="guia_bloco_header">
                 <h2 id="titulo_guia">Sobre o Motorsport Manager e guia dos atributos</h2>
                 <p>Perdido em o que é cada coisa desse monte de comparações? Aqui tiraremos algumas dúvidas sobre isso, confira abaixo!</p>
