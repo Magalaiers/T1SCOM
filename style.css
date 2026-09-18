@@ -549,11 +549,40 @@ input[type="search"]:focus {
     max-width: 70ch;
 }
 
+#guia_ajuda p,
+#guia_jogo p {
+  max-width: none; 
+}
+
+#guia_ajuda .guia_bloco_header p {
+    max-width: none !important;
+    width: 100%;
+}
+
+
 .campeonatos {
     display: flex;
     flex-direction: column;
-    gap: 2rem;
+    gap: 1rem;
 }
+
+.campeonatos_intro {
+    font-size: 1.15rem;
+    font-weight: 700;
+    color: var(--text-main);
+    margin-bottom: 1rem;
+    padding-bottom: 0.4rem;
+    border-bottom: 2px solid var(--border);
+    margin-bottom: 0.4rem;
+}
+
+.card_campeonato_header h4 {
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: var(--text-main);
+    margin: 0;
+    line-height: 1.3;
+  }
   
 .campeonatos_titulo {
     font-size: 1.15rem;
@@ -735,5 +764,38 @@ footer {
 
     .glossario_grid {
         grid-template-columns: repeat(3, 1fr);
+    }
+}
+
+@media (max-width: 480px) {
+    header > div,
+    .header_content {
+        flex-direction: column;
+        gap: 0.75rem;
+        text-align: center;
+    }
+
+    .main_nav ul {
+        gap: 0.75rem;
+        justify-content: center;
+    }
+}
+
+.container, 
+main {
+    width: 100%;
+    max-width: 100%;
+    overflow-x: hidden;
+}
+
+@media (max-width: 360px) {
+    .atributos_lista {
+        grid-template-columns: 1fr; 
+        gap: 0.25rem;
+    }
+
+    .piloto_info_basica {
+        grid-template-columns: 1fr; 
+        gap: 0.25rem;
     }
 }
