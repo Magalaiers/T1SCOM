@@ -11,7 +11,7 @@
     --accent-green-bg: #1f6f43;
     --accent-blue: #58a6ff;
     --text-main: #f0f6fc;
-    --text-muted: #8b949e;
+    --text-muted: #a3abb6;
     --border: #30363d;
     --border-light: rgba(240, 246, 252, 0.1);
     --font-stack: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
@@ -227,7 +227,7 @@ input[type="search"]:focus {
     padding: 1.5rem;
     border: 1px solid var(--border);
     min-height: 120px;
-    display: flex;
+    display: block;
     align-items: center;
     justify-content: center;
     margin-top: 1.5rem;
@@ -239,6 +239,7 @@ input[type="search"]:focus {
     text-align: center;
     font-style: italic;
     font-size: 0.95rem;
+    padding: 2.5rem 1rem;
 }
 
 .aviso_selecao {
@@ -794,6 +795,30 @@ footer {
 
     .glossario_grid {
         grid-template-columns: repeat(2, 1fr);
+    }
+
+    .comparador_resultado {
+        padding: 0.75rem 0.4rem;
+    }
+
+    .comparacao_tabela th, 
+    .comparacao_tabela td {
+        padding: 0.45rem 0.35rem; 
+        font-size: 0.8rem;         
+    }
+
+    .comparacao_tabela thead th {
+        font-size: 0.85rem;
+    }
+
+    .tabela_tag {
+        font-size: 0.72rem;
+        padding: 0.15rem 0.35rem;
+    }
+
+    .rating_stars {
+        font-size: 0.82rem;
+        letter-spacing: 0;
     }
 }
 

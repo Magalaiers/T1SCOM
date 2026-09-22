@@ -12,7 +12,7 @@ Observação: Não é necessário executar o arquivo em python (converter.py), o
 > python converter.py
 > ``` 
 
-Para fazer isso é necessário abrir um prompt de comando escrevendo cmd no caminho da pasta de arquivos do projeto e escrever na tela:
+Para rodar o site em um servidor local é necessário abrir um prompt de comando escrevendo cmd no caminho da pasta de arquivos do projeto e escrever na tela:
 > ```bash
 >python -m http.server 8000
 > ``` 
