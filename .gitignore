@@ -11,3 +11,16 @@ __pycache__/
 # Planilhas pesadas (opcional, se quiser manter só os CSVs ou o JSON no Git)
 *.xlsx
 *.xls
+
+# Dependências
+node_modules/
+vendor/
+
+# Variáveis de ambiente com senhas reais
+.env
+.env.local
+
+# Logs e arquivos temporários
+*.log
+.DS_Store
+Thumbs.db
