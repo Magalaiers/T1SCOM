@@ -1,14 +1,27 @@
-# Arquivos do editor e do sistema operacional
 .vscode/
 .idea/
 .DS_Store
 Thumbs.db
 
-# Caches e arquivos temporários do Python
+# TRABALHO 2 
+# Dependências do Node (NUNCA devem subir para o Git)
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Variáveis de ambiente com senhas reais (Proteção contra penalidade do edital)
+.env
+.env.local
+.env.*.local
+
+# Logs da aplicação
+*.log
+logs/
+
+# TRABALHO 1 
 __pycache__/
 *.pyc
-
-# Planilhas pesadas (opcional, se quiser manter só os CSVs ou o JSON no Git)
 *.xlsx
 *.xls
 
