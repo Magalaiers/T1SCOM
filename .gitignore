@@ -9,6 +9,7 @@ node_modules/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+vendor/
 
 # Variáveis de ambiente com senhas reais (Proteção contra penalidade do edital)
 .env
@@ -24,16 +25,3 @@ __pycache__/
 *.pyc
 *.xlsx
 *.xls
-
-# Dependências
-node_modules/
-vendor/
-
-# Variáveis de ambiente com senhas reais
-.env
-.env.local
-
-# Logs e arquivos temporários
-*.log
-.DS_Store
-Thumbs.db
