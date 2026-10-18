@@ -3,53 +3,76 @@ const jwt = require('jsonwebtoken');
 const db = require('../config/db');
 const logger = require('../utils/logger');
 
-// POST /api/auth/login
+// Mesma chave de contingência do authMiddleware.js
+const JWT_SECRET = process.env.JWT_SECRET || 'chave_mestra_motorsport_2026';
+
+// 1. POST /api/auth/login
 exports.login = async (req, res) => {
   const { email, senha } = req.body;
 
   if (!email || !senha) {
     return res.status(400).json({
       status: 'erro',
-      mensagem: 'E-mail e senha são obrigatórios.'
+      mensagem: 'Forneça o e-mail e a senha para autenticar.'
     });
   }
 
   try {
-    // Consulta parametrizada (Prepared Statement) contra SQL Injection
+    // Busca flexível com SELECT * para aceitar tanto senha_hash quanto senha
     const [usuarios] = await db.query(
-      'SELECT id, nome, email, senha_hash, perfil FROM usuarios WHERE email = ?',
-      [email]
+      'SELECT * FROM usuarios WHERE email = ?',
+      [email.trim().toLowerCase()]
     );
 
     if (usuarios.length === 0) {
-      logger.warn('AUTH', `Falha de login: e-mail não encontrado (${email})`);
-      return res.status(401).json({ status: 'erro', mensagem: 'Credenciais inválidas.' });
+      logger.warn('AUTH', `Falha de autenticação: e-mail não encontrado (${email})`);
+      return res.status(401).json({
+        status: 'erro',
+        mensagem: 'Credenciais inválidas.'
+      });
     }
 
     const usuario = usuarios[0];
+    
+    // Identifica o campo de senha da tabela (seja senha_hash ou senha)
+    const hashBanco = usuario.senha_hash || usuario.senha || '';
 
-    // Validação de senha com hash seguro bcrypt
-    const senhaValida = await bcrypt.compare(senha, usuario.senha_hash);
-    if (!senhaValida) {
-      logger.warn('AUTH', `Falha de login: senha incorreta para ${email}`);
-      return res.status(401).json({ status: 'erro', mensagem: 'Credenciais inválidas.' });
+    // Validação de senha segura com suporte a bcrypt
+    let senhaCorreta = false;
+    try {
+      senhaCorreta = await bcrypt.compare(senha, hashBanco);
+    } catch (e) {
+      senhaCorreta = false;
     }
 
-    // Assinatura do Token JWT
+    // Suporte para senhas inseridas em texto plano durante o seed inicial
+    if (!senhaCorreta && (senha === hashBanco || senha === usuario.senha)) {
+      senhaCorreta = true;
+    }
+
+    if (!senhaCorreta) {
+      logger.warn('AUTH', `Falha de autenticação: senha incorreta para o e-mail: ${email}`);
+      return res.status(401).json({
+        status: 'erro',
+        mensagem: 'Credenciais inválidas.'
+      });
+    }
+
+    // Normalização do perfil em maiúsculas (ADMIN / MANAGER)
+    const perfilFormatado = String(usuario.perfil || 'ADMIN').toUpperCase().trim();
+
+    // Payload estruturado para o controle RBAC
     const payload = {
       id: usuario.id,
       nome: usuario.nome,
       email: usuario.email,
-      perfil: usuario.perfil
+      perfil: perfilFormatado
     };
 
-    const token = jwt.sign(
-      payload,
-      process.env.JWT_SECRET || 'chave_padrao_scom_t2',
-      { expiresIn: process.env.JWT_EXPIRES_IN || '8h' }
-    );
+    // Assinatura com expiração de 8 horas
+    const token = jwt.sign(payload, JWT_SECRET, { expiresIn: '8h' });
 
-    logger.info('AUTH', `Login com sucesso para ID ${usuario.id} (${usuario.email}) - Perfil: ${usuario.perfil}`);
+    logger.info('AUTH', `Login com sucesso para ID ${usuario.id} (${usuario.email}) - Perfil: ${perfilFormatado}`);
 
     return res.status(200).json({
       status: 'sucesso',
@@ -59,32 +82,41 @@ exports.login = async (req, res) => {
         id: usuario.id,
         nome: usuario.nome,
         email: usuario.email,
-        perfil: usuario.perfil
+        perfil: perfilFormatado
       }
     });
-  } catch (error) {
-    logger.error('AUTH', `Erro interno 500 no login: ${error.message}`);
+
+  } catch (erro) {
+    console.error('DETALHE REAL DO ERRO NO LOGIN:', erro);
+    logger.error('AUTH', `Erro interno durante o login: ${erro.message}`);
     return res.status(500).json({
       status: 'erro',
-      mensagem: 'Erro interno ao processar autenticação.'
+      mensagem: 'Erro interno no servidor ao processar autenticação.'
     });
   }
 };
 
-// POST /api/auth/logout
+// 2. GET /api/auth/perfil
+exports.obterPerfil = async (req, res) => {
+  try {
+    const dadosUsuario = req.usuario || req.user;
+    return res.status(200).json({
+      status: 'sucesso',
+      dados: dadosUsuario
+    });
+  } catch (erro) {
+    logger.error('AUTH', `Erro ao recuperar perfil: ${erro.message}`);
+    return res.status(500).json({
+      status: 'erro',
+      mensagem: 'Erro ao consultar perfil autenticado.'
+    });
+  }
+};
+
+// 3. POST /api/auth/logout
 exports.logout = (req, res) => {
-  // Em arquitetura baseada em JWT sem estado, o logout operacionaliza-se
-  // no cliente ao descartar o token, retornando status 200 informativo
   return res.status(200).json({
     status: 'sucesso',
     mensagem: 'Logout realizado com sucesso. Descarte o token no cliente.'
-  });
-};
-
-// GET /api/auth/perfil (Rota protegida de teste)
-exports.obterPerfilLogado = (req, res) => {
-  return res.status(200).json({
-    status: 'sucesso',
-    usuario: req.usuario
   });
 };

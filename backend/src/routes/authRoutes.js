@@ -7,6 +7,7 @@ router.post('/login', authController.login);
 router.post('/logout', authController.logout);
 
 // Rota de verificação do usuário logado (exige token)
-router.get('/perfil', autenticarToken, authController.obterPerfilLogado);
+const handlerPerfil = authController.obterPerfil || authController.perfil;
+router.get('/perfil', autenticarToken, handlerPerfil);
 
 module.exports = router;
