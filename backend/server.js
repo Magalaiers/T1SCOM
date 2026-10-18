@@ -26,3 +26,5 @@ app.listen(PORT, () => {
 app.use((req, res) => {
   res.status(404).json({status:'erro', mensagem: 'Rota não encontrada.'});
 });
+
+module.exports = app;
