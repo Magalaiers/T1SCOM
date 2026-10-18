@@ -1,6 +1,24 @@
+const fs = require('fs');
+const { type } = require('os');
+const path = require('path');
+
+const logDir = path.join(__dirname, '../../logs');
+if (!fs.existsSync(logDir)) {
+    fs.mkdirSync(logDir, {recursive: true});
+}
+
+const logFilePath = path.join(logDir, 'app.log');
+
 function log(tipo, modulo, ...mensagens) {
     const timestamp = new Date().toISOString();
-    console.log(`[${timestamp}] [${tipo.toUpperCase()}] [${modulo.toUpperCase()}]`, ...mensagens);
+    const textoMensagens = mensagens.map(m => (typeof m === 'object' ? JSON.stringify(m) : m)).join(' ');
+    const linhaLog = `[${timestamp}] [${tipo.toUpperCase()}] [${modulo.toUpperCase()}] ${textoMensagens}\n`;
+
+    process.stdout.write(linhaLog);
+
+    fs.appendFile(logFilePath, linhaLog, (err) => {
+        if (err) console.error('Falha ao gravar arquivo de log:', err.message);
+    });
 }
   
 module.exports = {
