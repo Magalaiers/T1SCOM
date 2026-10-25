@@ -1,5 +1,4 @@
 let pilotosData = [];
-let equipesData = [];
 
 // Estado Global da Listagem
 let paginaAtual = 1;
@@ -28,22 +27,23 @@ document.addEventListener('DOMContentLoaded', async () => {
   configurarEventosComparacao();
 });
 
-// 1. Carregamento Assíncrono da Base de Dados
+// 1. Carregamento Assíncrono da Base de Dados MYSQL via API
 async function carregarDados() {
   try {
-    const resposta = await fetch('./dados.json');
-    if (!resposta.ok) throw new Error('Falha ao carregar dados.json');
-    const dados = await resposta.json();
-    pilotosData = dados.pilotos || [];
-    equipesData = dados.equipes || [];
+    const resposta = await fetch('http://localhost:3000/api/pilotos');
+    if (!resposta.ok) {
+      throw new Error('Falha na resposta do servidor Node.js');
+    }
+    const respostaFinal = await resposta.json();
+    pilotosData = respostaFinal.dados || []; 
   } catch (erro) {
-    console.error('Erro na requisição:', erro);
+    console.error('Falha na conexão:', erro);
     const painel = document.getElementById('painel_comparativo');
     if (painel) {
       painel.innerHTML = `
         <div class="msg_erro" role="alert">
-          <p>⚠️ Falha ao carregar a base de dados (dados.json).</p>
-          <small>Certifique-se de executar via servidor local HTTP com o dados.json na raiz.</small>
+          <p>⚠️ Falha ao conectar com o servidor backend (Node.js).</p>
+          <small>Certifique-se de que a API Node.js (porta 3000) e o MySQL estão rodando.</small>
         </div>
       `;
     }
@@ -58,18 +58,8 @@ function obterSeletoresComparador() {
 }
 
 // 3. Regras de Negócio e Cálculos Relacionais
-function obterEquipe(equipeId) {
-  if (equipeId === null || equipeId === undefined) return null;
-  return equipesData.find(e => String(e.id) === String(equipeId)) || null;
-}
-
-function obterNomeEquipe(equipeId) {
-  const equipe = obterEquipe(equipeId);
-  return equipe ? equipe.nome : 'Sem Equipe (Disponível)';
-}
-
 function obterValorAtributo(piloto, itemConfig) {
-  if (!piloto || !piloto.atributos) return 10;
+  if (!piloto || !piloto.atributos) return Math.floor(piloto.overrall * 0.2); // Simula caso não venha no SQL
   if (piloto.atributos[itemConfig.chave] !== undefined) {
     return Number(piloto.atributos[itemConfig.chave]);
   }
@@ -78,18 +68,15 @@ function obterValorAtributo(piloto, itemConfig) {
       return Number(piloto.atributos[alias]);
     }
   }
-  return 10;
+  return Math.floor(piloto.overrall * 0.2);
 }
 
 function calcularEstrelasAtuais(piloto) {
   if (piloto.estrelas_atuais && !isNaN(piloto.estrelas_atuais) && Number(piloto.estrelas_atuais) > 0) {
     return Number(piloto.estrelas_atuais);
   }
-  if (piloto.atributos) {
-    const valores = ATRIBUTOS_CONFIG.map(cfg => obterValorAtributo(piloto, cfg));
-    const media = valores.reduce((a, b) => a + b, 0) / valores.length;
-    const escala = Math.max(...valores) > 20 ? 100 : 20;
-    return Number(((media / escala) * 5).toFixed(1));
+  if (piloto.overrall) {
+    return Number((piloto.overrall / 20).toFixed(1)); // Transforma o 0-100 do banco em 0-5.0
   }
   return 3.0;
 }
@@ -134,8 +121,7 @@ function inicializarControles() {
   if (s1 && s2) {
     const pilotosOrdenados = [...pilotosData].sort((a, b) => a.nome.localeCompare(b.nome));
     pilotosOrdenados.forEach(p => {
-      const eq = obterEquipe(p.equipe_id);
-      const eqNome = eq ? eq.nome : 'Disponível';
+      const eqNome = p.equipe_id ? p.nome_equipe : 'Disponível';
       const rating = calcularEstrelasAtuais(p);
       const label = `${p.nome} [${rating}★] (${eqNome})`;
       s1.add(new Option(label, p.id));
@@ -144,9 +130,18 @@ function inicializarControles() {
   }
 
   if (filtroEquipe) {
-    equipesData.forEach(eq => {
+    const equipesUnicas = [];
+    pilotosData.forEach(p => {
+      if (p.equipe_id && !equipesUnicas.some(e => e.id === p.equipe_id)) {
+        equipesUnicas.push({ id: p.equipe_id, nome: p.nome_equipe });
+      }
+    });
+
+    filtroEquipe.add(new Option('🟢 Agentes Livres (Disponíveis)', 'livres'));
+    equipesUnicas.forEach(eq => {
       filtroEquipe.add(new Option(eq.nome, eq.id));
     });
+
     filtroEquipe.addEventListener('change', (e) => {
       filtroEquipeSelecionada = e.target.value;
       paginaAtual = 1;
@@ -192,7 +187,7 @@ function processarPilotosFiltrados() {
 
       if (termoBusca) {
         const nomeOk = (p.nome || '').toLowerCase().includes(termoBusca);
-        const paisOk = (p.nacionalidade || '').toLowerCase().includes(termoBusca);
+        const paisOk = (p.nacionalidade || p.pais || '').toLowerCase().includes(termoBusca);
         if (!nomeOk && !paisOk) return false;
       }
       return true;
@@ -239,11 +234,10 @@ function renderizarCatalogo() {
   }
 
   paginaPilotos.forEach(piloto => {
-    const eq = obterEquipe(piloto.equipe_id);
-    const livre = !eq;
-    const badgeTxt = livre ? 'Disponível' : eq.nome;
-    const badgeBg = livre ? '#1f6f43' : (eq.cor_primaria || '#383e4d');
-    const badgeCor = livre ? '#ffffff' : (eq.cor_secundaria || '#ffffff');
+    const livre = !piloto.equipe_id;
+    const badgeTxt = livre ? 'Disponível' : piloto.nome_equipe;
+    const badgeBg = livre ? '#1f6f43' : (piloto.cor_primaria || '#383e4d');
+    const badgeCor = livre ? '#ffffff' : (piloto.cor_secundaria || '#ffffff');
     const badgeBorda = livre ? '1px solid #2ea043' : 'none';
 
     const estrelasAtuais = calcularEstrelasAtuais(piloto);
@@ -285,7 +279,7 @@ function renderizarCatalogo() {
 
       <div class="piloto_info_basica">
         <span>Idade: <strong>${piloto.idade || 25} anos</strong></span>
-        <span>Origem: <strong>${piloto.nacionalidade || 'N/A'}</strong></span>
+        <span>Origem: <strong>${piloto.nacionalidade || piloto.pais || 'N/A'}</strong></span>
         <span>Salário: <strong>${formatarSalario(piloto.salario_anual)}</strong></span>
         <span>Série: <strong>${piloto.series_preference || 'Any'}</strong></span>
         <span>Comercial: <strong>${piloto.marketability || '0%'}</strong></span>
@@ -459,8 +453,8 @@ function renderizarPainelComparativo(p1, p2) {
         <tbody>
           <tr>
             <th scope="row">Equipe</th>
-            <td><span class="tabela_tag">${obterNomeEquipe(p1.equipe_id)}</span></td>
-            <td><span class="tabela_tag">${obterNomeEquipe(p2.equipe_id)}</span></td>
+            <td><span class="tabela_tag">${p1.equipe_id ? p1.nome_equipe : 'Disponível'}</span></td>
+            <td><span class="tabela_tag">${p2.equipe_id ? p2.nome_equipe : 'Disponível'}</span></td>
           </tr>
           <tr>
             <th scope="row">Idade</th>

@@ -4,13 +4,18 @@ const logger = require('../utils/logger');
 // GET /api/pilotos
 exports.listarPilotos = async (req, res) => {
   try {
-    // Consulta simples, sem JOINs complexos para evitar erros de coluna inexistente
-    const [pilotos] = await db.query('SELECT * FROM pilotos ORDER BY nome ASC');
+    // Esse JOIN junta o piloto com a equipe dele, trazendo as cores da equipe para o Frontend desenhar as badges!
+    const query = `
+      SELECT p.*, e.nome AS nome_equipe, e.cor_primaria, e.cor_secundaria
+      FROM pilotos p
+      LEFT JOIN equipes e ON p.equipe_id = e.id
+      ORDER BY p.nome ASC
+    `;
+    const [pilotos] = await db.query(query);
     
     return res.status(200).json({ status: 'sucesso', dados: pilotos });
   } catch (erro) {
     console.error('------- ERRO NO MYSQL (GET TODOS) -------', erro);
-    logger.error('PILOTOS', `Erro ao listar: ${erro.message}`);
     return res.status(500).json({ status: 'erro', mensagem: 'Erro interno no servidor.' });
   }
 };

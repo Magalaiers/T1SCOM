@@ -4,8 +4,8 @@ const pilotoController = require('../controllers/pilotoController');
 const { autenticarToken, autorizarPerfis } = require('../middlewares/authMiddleware');
 
 // Rotas de leitura
-router.get('/', autenticarToken, pilotoController.listarPilotos);
-router.get('/:id', autenticarToken, pilotoController.obterPiloto);
+router.get('/', pilotoController.listarPilotos);
+router.get('/:id', pilotoController.obterPiloto);
 
 // Rotas de Escrita
 router.post('/', autenticarToken, autorizarPerfis('ADMIN'), pilotoController.criarPiloto);
