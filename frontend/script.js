@@ -21,6 +21,7 @@ const ATRIBUTOS_CONFIG = [
 ];
 
 document.addEventListener('DOMContentLoaded', async () => {
+  gerenciarSessaoInterface()
   await carregarDados();
   inicializarControles();
   renderizarCatalogo();
@@ -527,3 +528,35 @@ function atualizarMenuAtivo() {
   
   window.addEventListener('scroll', atualizarMenuAtivo);
   document.addEventListener('DOMContentLoaded', atualizarMenuAtivo);
+
+  // --- CONTROLE DE SESSÃO E RBAC ---
+function gerenciarSessaoInterface() {
+  const authContainer = document.getElementById('auth_container');
+  const token = localStorage.getItem('jwt_token');
+  const nomeUsuario = localStorage.getItem('usuario_nome');
+  const perfilUsuario = localStorage.getItem('usuario_perfil');
+
+  if (token && nomeUsuario) {
+    // Modo Logado (MANAGER ou ADMIN)
+    authContainer.innerHTML = `
+      <span class="user_badge">Olá, <strong>${nomeUsuario}</strong> <span class="user_perfil">${perfilUsuario}</span></span>
+      <button onclick="fazerLogout()" class="btn_logout">Sair</button>
+    `;
+    
+    // No futuro, podemos liberar botões de edição aqui
+    // if(perfilUsuario === 'ADMIN') { habilitarBotaoExcluir(); }
+  } else {
+    // Modo Visitante (Não logado)
+    authContainer.innerHTML = `
+      <a href="login.html" class="btn_login_nav">Entrar no Sistema</a>
+    `;
+  }
+}
+
+// Função global atrelada ao botão de Sair
+window.fazerLogout = function() {
+  localStorage.removeItem('jwt_token');
+  localStorage.removeItem('usuario_nome');
+  localStorage.removeItem('usuario_perfil');
+  window.location.href = window.location.pathname; // Caminho absoluto e seguro
+};

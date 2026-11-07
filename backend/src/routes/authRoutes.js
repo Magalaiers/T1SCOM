@@ -5,6 +5,7 @@ const { autenticarToken } = require('../middlewares/authMiddleware');
 
 router.post('/login', authController.login);
 router.post('/logout', authController.logout);
+router.post('/registrar', authController.registrar);
 
 // Rota de verificação do usuário logado (exige token)
 const handlerPerfil = authController.obterPerfil || authController.perfil;

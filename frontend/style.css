@@ -129,6 +129,56 @@ h5,
     list-style: none;
 }
 
+.main_nav {
+    display: flex;
+    gap: 2rem;
+    list-style: none;
+}
+
+.auth_box {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding-left: 1.5rem;
+  border-left: 1px solid var(--border);
+}
+
+.btn_login_nav {
+  background-color: var(--accent);
+  color: white;
+  padding: 0.4rem 0.8rem;
+  border-radius: var(--radius);
+  text-decoration: none;
+  font-weight: 600;
+  font-size: 0.85rem;
+  transition: opacity 0.2s;
+}
+
+.btn_login_nav:hover { opacity: 0.8; }
+
+.user_badge {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+.user_badge strong { color: var(--text-main); }
+.user_perfil {
+  background-color: var(--bg-card);
+  padding: 0.1rem 0.4rem;
+  border-radius: 4px;
+  font-size: 0.7rem;
+  color: var(--accent-gold);
+  border: 1px solid var(--accent-gold);
+}
+.btn_logout {
+  background: none;
+  border: none;
+  color: #ff6b6b;
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-decoration: underline;
+}
+
 .nav_links {
     color: var(--text-muted);
     text-decoration: none;
