@@ -8,6 +8,23 @@ let termoBusca = '';
 let filtroEquipeSelecionada = 'todas';
 let criterioOrdenacao = 'rating_desc';
 
+const API_URL = 'http://localhost:3000/api';
+
+// Escape de HTML para todo texto vindo do servidor/usuário que entra em innerHTML (defesa contra XSS)
+function esc(valor) {
+  return String(valor ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+// Aceita apenas cores hexadecimais; qualquer outra coisa cai no valor padrão
+function corSegura(cor, padrao) {
+  return /^#[0-9a-fA-F]{3,8}$/.test(String(cor || '')) ? cor : padrao;
+}
+
 // Configuração canônica dos 9 atributos técnicos
 const ATRIBUTOS_CONFIG = [
   { chave: 'frenagem', rotulo: 'Frenagem', alias: ['braking', 'frenagem'] },
@@ -22,7 +39,7 @@ const ATRIBUTOS_CONFIG = [
 ];
 
 document.addEventListener('DOMContentLoaded', async () => {
-  await carregarDados();
+  await Promise.all([carregarDados(), carregarEquipes()]);
   inicializarControles();
   renderizarCatalogo();
   configurarEventosComparacao();
@@ -52,6 +69,19 @@ async function carregarDados() {
   }
 }
 
+
+async function carregarEquipes() {
+  try {
+    const resposta = await fetch(`${API_URL}/equipes`);
+    if (!resposta.ok) throw new Error('Falha ao carregar equipes');
+    const corpo = await resposta.json();
+    equipesData = corpo.dados || [];
+  } catch (erro) {
+    console.error('Falha ao carregar equipes:', erro);
+    equipesData = [];
+  }
+}
+
 // 2. Localizadores Flexíveis de Elementos do DOM
 function obterSeletoresComparador() {
   const s1 = document.getElementById('select_piloto_1') || document.getElementById('select_p1');
@@ -61,7 +91,7 @@ function obterSeletoresComparador() {
 
 // 3. Regras de Negócio e Cálculos Relacionais
 function obterValorAtributo(piloto, itemConfig) {
-  if (!piloto || !piloto.atributos) return 10; // Valor neutro base se falhar
+  if (!piloto || !piloto.atributos) return null; // sem dado: a interface mostra "—" (não inventa valor)
   
   if (piloto.atributos[itemConfig.chave] !== undefined) {
     return Number(piloto.atributos[itemConfig.chave]);
@@ -71,7 +101,7 @@ function obterValorAtributo(piloto, itemConfig) {
       return Number(piloto.atributos[alias]);
     }
   }
-  return 10;
+  return null;
 }
 
 function calcularEstrelasAtuais(piloto) {
@@ -82,11 +112,13 @@ function calcularEstrelasAtuais(piloto) {
   
   // 2. Calcula a média dinâmica dos 9 atributos reais se não vier
   if (piloto.atributos) {
-    const valores = ATRIBUTOS_CONFIG.map(cfg => obterValorAtributo(piloto, cfg));
-    const media = valores.reduce((a, b) => a + b, 0) / valores.length;
-    // O jogo usa nota máxima 20 por atributo
-    const estrelas = (media / 20) * 5;
-    return Number(Math.max(0.5, Math.min(5.0, estrelas)).toFixed(1));
+    const valores = ATRIBUTOS_CONFIG.map(cfg => obterValorAtributo(piloto, cfg)).filter(v => v !== null);
+    if (valores.length > 0) {
+      const media = valores.reduce((a, b) => a + b, 0) / valores.length;
+      // O jogo usa nota máxima 20 por atributo
+      const estrelas = (media / 20) * 5;
+      return Number(Math.max(0.5, Math.min(5.0, estrelas)).toFixed(1));
+    }
   }
   
   return 3.0; // Padrão se não houver telemetria
@@ -121,18 +153,19 @@ function renderizarEstrelasVisual(nota) {
   return `<span class="rating_stars" title="${valor.toFixed(1)} de 5.0 estrelas">${icones} <small>(${valor.toFixed(1)})</small></span>`;
 }
 
-// 4. Inicialização dos Controles (Filtros, Buscas, Ordenação)
-function inicializarControles() {
+// 4. Controles (Filtros, Buscas, Ordenação)
+// popularControles() pode ser chamada de novo após cadastrar/editar/excluir;
+// inicializarControles() registra os listeners uma única vez.
+function popularControles() {
   const { s1, s2 } = obterSeletoresComparador();
   const filtroEquipe = document.getElementById('filtro_equipe');
-  const campoBusca = document.getElementById('busca_piloto');
-  const selectOrdenacao = document.getElementById('ordenar_piloto');
-  const selectQtd = document.getElementById('itens_por_pagina');
 
   if (s1 && s2) {
+    const anterior1 = s1.value;
+    const anterior2 = s2.value;
     s1.innerHTML = '<option value="">Selecione um piloto...</option>';
     s2.innerHTML = '<option value="">Selecione um piloto...</option>';
-    
+
     const pilotosOrdenados = [...pilotosData].sort((a, b) => a.nome.localeCompare(b.nome));
     pilotosOrdenados.forEach(p => {
       const eqNome = p.equipe_id ? p.nome_equipe : 'Disponível';
@@ -141,6 +174,11 @@ function inicializarControles() {
       s1.add(new Option(label, p.id));
       s2.add(new Option(label, p.id));
     });
+
+    // Mantém a seleção do comparador (se o piloto ainda existir) e redesenha o painel
+    if ([...s1.options].some(o => o.value === anterior1)) s1.value = anterior1;
+    if ([...s2.options].some(o => o.value === anterior2)) s2.value = anterior2;
+    if (s1.value && s2.value) s1.dispatchEvent(new Event('change'));
   }
 
   if (filtroEquipe) {
@@ -157,6 +195,21 @@ function inicializarControles() {
       filtroEquipe.add(new Option(eq.nome, eq.id));
     });
 
+    const aindaExiste = [...filtroEquipe.options].some(o => o.value === String(filtroEquipeSelecionada));
+    if (!aindaExiste) filtroEquipeSelecionada = 'todas';
+    filtroEquipe.value = String(filtroEquipeSelecionada);
+  }
+}
+
+function inicializarControles() {
+  const filtroEquipe = document.getElementById('filtro_equipe');
+  const campoBusca = document.getElementById('busca_piloto');
+  const selectOrdenacao = document.getElementById('ordenar_piloto');
+  const selectQtd = document.getElementById('itens_por_pagina');
+
+  popularControles();
+
+  if (filtroEquipe) {
     filtroEquipe.addEventListener('change', (e) => {
       filtroEquipeSelecionada = e.target.value;
       paginaAtual = 1;
@@ -188,6 +241,13 @@ function inicializarControles() {
       renderizarCatalogo();
     });
   }
+}
+
+// Recarrega dados do servidor e atualiza toda a interface (usado após criar/editar/excluir)
+async function recarregarTela() {
+  await carregarDados();
+  popularControles();
+  renderizarCatalogo();
 }
 
 // 5. Filtragem, Ordenação e Renderização do Plantel
@@ -251,8 +311,8 @@ function renderizarCatalogo() {
   paginaPilotos.forEach(piloto => {
     const livre = !piloto.equipe_id;
     const badgeTxt = livre ? 'Disponível' : piloto.nome_equipe;
-    const badgeBg = livre ? '#1f6f43' : (piloto.cor_primaria || '#383e4d');
-    const badgeCor = livre ? '#ffffff' : (piloto.cor_secundaria || '#ffffff');
+    const badgeBg = livre ? '#1f6f43' : corSegura(piloto.cor_primaria, '#383e4d');
+    const badgeCor = livre ? '#ffffff' : corSegura(piloto.cor_secundaria, '#ffffff');
     const badgeBorda = livre ? '1px solid #2ea043' : 'none';
 
     const estrelasAtuais = calcularEstrelasAtuais(piloto);
@@ -267,13 +327,13 @@ function renderizarCatalogo() {
       
       const botoesAcao = podeEditar ? `
         <div class="card_acoes_crud">
-          <button class="btn_editar_piloto" onclick="editarPiloto(${piloto.id})" title="Editar piloto" style="background:transparent; border:none; cursor:pointer;">✏️</button>
-          <button class="btn_excluir_piloto" onclick="excluirPiloto(${piloto.id})" title="Demitir piloto" style="background:transparent; border:none; cursor:pointer;">🗑️</button>
+          <button class="btn_editar_piloto" onclick="editarPiloto(${Number(piloto.id)})" title="Editar piloto" style="background:transparent; border:none; cursor:pointer;">✏️</button>
+          <button class="btn_excluir_piloto" onclick="excluirPiloto(${Number(piloto.id)})" title="Demitir piloto" style="background:transparent; border:none; cursor:pointer;">🗑️</button>
         </div>
       ` : '';
 
     const itensAttr = ATRIBUTOS_CONFIG.map(attr => `
-      <li>${attr.rotulo}: <span>${obterValorAtributo(piloto, attr)}</span></li>
+      <li>${attr.rotulo}: <span>${obterValorAtributo(piloto, attr) ?? '—'}</span></li>
     `).join('');
 
     const card = document.createElement('article');
@@ -282,14 +342,14 @@ function renderizarCatalogo() {
 
     card.innerHTML = `
       <figure>
-        <div class="avatar_piloto" aria-hidden="true">${(piloto.nome || 'P').charAt(0)}</div>
+        <div class="avatar_piloto" aria-hidden="true">${esc((piloto.nome || 'P').charAt(0))}</div>
         <figcaption style="display: flex; flex-direction: column; width: 100%;">
           <div style="display: flex; justify-content: space-between; align-items: start; width: 100%;">
-             <h3 style="margin:0;">${piloto.nome} ${payBadge}</h3>
+             <h3 style="margin:0;">${esc(piloto.nome)} ${payBadge}</h3>
              ${botoesAcao}
           </div>
           <span class="badge_equipe" style="background-color: ${badgeBg}; color: ${badgeCor}; border: ${badgeBorda}; width: fit-content; margin-top: 5px;">
-            ${badgeTxt}
+            ${esc(badgeTxt)}
           </span>
         </figcaption>
       </figure>
@@ -307,10 +367,10 @@ function renderizarCatalogo() {
 
       <div class="piloto_info_basica">
         <span>Idade: <strong>${piloto.idade || 25} anos</strong></span>
-        <span>Origem: <strong>${piloto.nacionalidade || piloto.pais || 'N/A'}</strong></span>
+        <span>Origem: <strong>${esc(piloto.nacionalidade || piloto.pais || 'N/A')}</strong></span>
         <span>Salário: <strong>${formatarSalario(piloto.salario_anual)}</strong></span>
-        <span>Série: <strong>${piloto.series_preference || 'Any'}</strong></span>
-        <span>Comercial: <strong>${piloto.marketability || '0%'}</strong></span>
+        <span>Série: <strong>${esc(piloto.series_preference || 'Any')}</strong></span>
+        <span>Comercial: <strong>${esc(piloto.marketability || '0%')}</strong></span>
         <span>Piloto Pagante: <strong>${piloto.pay_driver ? '<span class="tag_sim_verde">Sim</span>' : 'Não'}</strong></span>
       </div>
 
@@ -463,26 +523,26 @@ function renderizarPainelComparativo(p1, p2) {
     return `
       <tr>
         <th scope="row">${cfg.rotulo}</th>
-        <td class="${res.c1}"><strong>${v1}</strong></td>
-        <td class="${res.c2}"><strong>${v2}</strong></td>
+        <td class="${res.c1}"><strong>${v1 ?? '—'}</strong></td>
+        <td class="${res.c2}"><strong>${v2 ?? '—'}</strong></td>
       </tr>
     `;
   }).join('');
 
   painel.innerHTML = `
-    <table class="comparacao_tabela" aria-label="Comparação direta entre ${p1.nome} e ${p2.nome}">
+    <table class="comparacao_tabela" aria-label="Comparação direta entre ${esc(p1.nome)} e ${esc(p2.nome)}">
       <thead>
         <tr>
           <th scope="col" style="width: 34%;">Métrica / Atributo</th>
-          <th scope="col" style="width: 33%;">${p1.nome}</th>
-          <th scope="col" style="width: 33%;">${p2.nome}</th>
+          <th scope="col" style="width: 33%;">${esc(p1.nome)}</th>
+          <th scope="col" style="width: 33%;">${esc(p2.nome)}</th>
         </tr>
       </thead>
       <tbody>
         <tr>
           <th scope="row">Equipe</th>
-          <td><span class="tabela_tag">${p1.equipe_id ? p1.nome_equipe : 'Disponível'}</span></td>
-          <td><span class="tabela_tag">${p2.equipe_id ? p2.nome_equipe : 'Disponível'}</span></td>
+          <td><span class="tabela_tag">${esc(p1.equipe_id ? p1.nome_equipe : 'Disponível')}</span></td>
+          <td><span class="tabela_tag">${esc(p2.equipe_id ? p2.nome_equipe : 'Disponível')}</span></td>
         </tr>
         <tr>
           <th scope="row">Idade</th>
@@ -491,8 +551,8 @@ function renderizarPainelComparativo(p1, p2) {
         </tr>
         <tr>
           <th scope="row">Preferência de Série</th>
-          <td><span class="tabela_tag">${p1.series_preference || 'Any'}</span></td>
-          <td><span class="tabela_tag">${p2.series_preference || 'Any'}</span></td>
+          <td><span class="tabela_tag">${esc(p1.series_preference || 'Any')}</span></td>
+          <td><span class="tabela_tag">${esc(p2.series_preference || 'Any')}</span></td>
         </tr>
         <tr>
           <th scope="row">Piloto Pagante</th>
@@ -570,97 +630,18 @@ function gerenciarSessaoInterface() {
   if (painelAdmin) painelAdmin.style.display = 'none';
 
   if (token && nomeUsuario) {
-    // 1. Renderiza crachá logado
+    // 1. Renderiza crachá logado (nome e perfil vêm do localStorage: sempre escapados)
     if (authContainer) {
       authContainer.innerHTML = `
-        <span class="user_badge">Olá, <strong>${nomeUsuario}</strong> <span class="user_perfil">${perfilUsuario}</span></span>
+        <span class="user_badge">Olá, <strong>${esc(nomeUsuario)}</strong> <span class="user_perfil">${esc(perfilUsuario)}</span></span>
         <button onclick="fazerLogout()" class="btn_logout">Sair</button>
       `;
     }
-    
-    // 2. Libera recursos ADMIN e MANAGER
+
+    // 2. Libera recursos ADMIN e MANAGER (a API revalida o perfil a cada requisição)
     if ((perfilUsuario === 'ADMIN' || perfilUsuario === 'MANAGER') && painelAdmin) {
       painelAdmin.style.display = 'flex';
-      
-      const btnNovo = document.getElementById('btn_novo_piloto');
-      const modal = document.getElementById('modal_piloto');
-      const formCrud = document.getElementById('form_crud_piloto');
-      const btnFechar = document.getElementById('btn_fechar_modal');
-      const btnCancelar = document.getElementById('btn_cancelar_modal');
-
-      if (btnNovo && modal) {
-        // Blinda listeners duplicados recriando o botão visualmente
-        const novoBotao = btnNovo.cloneNode(true);
-        btnNovo.parentNode.replaceChild(novoBotao, btnNovo);
-        
-        // Abre Modal e popula Select de Equipes
-        novoBotao.addEventListener('click', () => {
-          if (formCrud) formCrud.reset();
-          const selectEq = document.getElementById('crud_equipe');
-          if (selectEq && selectEq.options.length <= 1) {
-            equipesData.forEach(eq => selectEq.add(new Option(eq.nome, eq.id)));
-          }
-          modal.showModal();
-        });
-
-        // Fecha Modal
-        const fecharModal = () => modal.close();
-        if (btnFechar) btnFechar.addEventListener('click', fecharModal);
-        if (btnCancelar) btnCancelar.addEventListener('click', fecharModal);
-
-        // Dispara POST API Node.js
-        if (formCrud) {
-          const novoForm = formCrud.cloneNode(true);
-          formCrud.parentNode.replaceChild(novoForm, formCrud);
-          
-          novoForm.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const btnSalvarAtual = document.getElementById('btn_salvar_piloto');
-            if (btnSalvarAtual) {
-              btnSalvarAtual.disabled = true;
-              btnSalvarAtual.textContent = 'Salvando...';
-            }
-
-            const novoPiloto = {
-              nome: document.getElementById('crud_nome').value.trim(),
-              pais: document.getElementById('crud_pais').value.trim(), 
-              idade: Number(document.getElementById('crud_idade').value),
-              salario_anual: Number(document.getElementById('crud_salario').value),
-              overrall: Number(document.getElementById('crud_overall').value),
-              equipe_id: document.getElementById('crud_equipe').value ? Number(document.getElementById('crud_equipe').value) : null,
-              status_contrato: document.getElementById('crud_equipe').value ? 'Contratado' : 'Agente Livre'
-            };
-
-            try {
-              const resposta = await fetch('http://localhost:3000/api/pilotos', {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                  'Authorization': `Bearer ${token}` 
-                },
-                body: JSON.stringify(novoPiloto)
-              });
-
-              const data = await resposta.json();
-              if (!resposta.ok) throw new Error(data.mensagem || 'Falha ao cadastrar.');
-
-              alert('Piloto cadastrado com sucesso!');
-              document.getElementById('modal_piloto').close();
-              
-              await carregarDados(); 
-              inicializarControles(); // Atualiza selectores do comparador
-              renderizarCatalogo(); // Atualiza a tela
-            } catch (err) {
-              alert(err.message);
-            } finally {
-              if (btnSalvarAtual) {
-                btnSalvarAtual.disabled = false;
-                btnSalvarAtual.textContent = 'Salvar Piloto';
-              }
-            }
-          });
-        }
-      }
+      configurarModalPiloto();
     }
   } else {
     // Modo Visitante (Não logado)
@@ -670,11 +651,17 @@ function gerenciarSessaoInterface() {
   }
 }
 
-window.fazerLogout = function() {
+window.fazerLogout = async function() {
+  const token = localStorage.getItem('jwt_token');
+  try {
+    if (token) {
+      await fetch(`${API_URL}/auth/logout`, { method: 'POST', headers: { 'Authorization': `Bearer ${token}` } });
+    }
+  } catch (_) { /* logout local acontece de qualquer forma */ }
   localStorage.removeItem('jwt_token');
   localStorage.removeItem('usuario_nome');
   localStorage.removeItem('usuario_perfil');
-  window.location.href = window.location.pathname; 
+  window.location.href = window.location.pathname;
 };
 
 // ==========================================
@@ -682,7 +669,7 @@ window.fazerLogout = function() {
 // ==========================================
 window.excluirPiloto = async function(id) {
   const token = localStorage.getItem('jwt_token');
-  
+
   if (!token) {
     alert("Sessão expirada. Faça login novamente.");
     return;
@@ -692,10 +679,10 @@ window.excluirPiloto = async function(id) {
   if (!confirmacao) return;
 
   try {
-    const resposta = await fetch(`http://localhost:3000/api/pilotos/${id}`, {
+    const resposta = await fetch(`${API_URL}/pilotos/${id}`, {
       method: 'DELETE',
       headers: {
-        'Authorization': `Bearer ${token}` 
+        'Authorization': `Bearer ${token}`
       }
     });
 
@@ -703,58 +690,211 @@ window.excluirPiloto = async function(id) {
     if (!resposta.ok) throw new Error(data.mensagem || 'Falha ao excluir o piloto.');
 
     alert('✅ Piloto demitido com sucesso!');
-    
-    // Atualiza a tela puxando do banco novamente
-    await carregarDados(); 
-    inicializarControles();
-    renderizarCatalogo();
+    await recarregarTela();
   } catch (err) {
     alert("Erro na exclusão: " + err.message);
   }
 };
 
-// 2. Ação de EDITAR (PUT)
-window.editarPiloto = function(id) {
-  const token = localStorage.getItem('jwt_token');
-  if (!token) return alert("Sessão expirada. Faça login novamente.");
+// ==========================================
+// --- 11. CADASTRO E EDIÇÃO (POST / PUT)   ---
+// ==========================================
+let modalPilotoConfigurado = false;
 
-  // 1. Encontra os dados atuais do piloto selecionado
-  const pilotoSelecionado = pilotosData.find(p => String(p.id) === String(id));
-  if (!pilotoSelecionado) return alert("Erro: Piloto não encontrado na base.");
+// Os 9 campos de atributo são gerados a partir de ATRIBUTOS_CONFIG (fonte única da lista)
+function montarCamposAtributos() {
+  const container = document.getElementById('crud_atributos');
+  if (!container || container.childElementCount > 0) return;
 
-  // 2. Puxa os elementos visuais do Modal
-  const modal = document.getElementById('modal_piloto');
-  const formCrud = document.getElementById('form_crud_piloto');
-  const selectEq = document.getElementById('crud_equipe');
-  const tituloModal = document.getElementById('modal_crud_titulo');
+  ATRIBUTOS_CONFIG.forEach(cfg => {
+    const grupo = document.createElement('div');
+    grupo.className = 'form_group';
+
+    const label = document.createElement('label');
+    label.htmlFor = `crud_attr_${cfg.chave}`;
+    label.textContent = cfg.rotulo;
+
+    const input = document.createElement('input');
+    input.type = 'number';
+    input.id = `crud_attr_${cfg.chave}`;
+    input.min = '0';
+    input.max = '20';
+    input.step = '1';
+    input.required = true;
+    input.setAttribute('value', '10'); // valor inicial visível; form.reset() volta para ele
+
+    grupo.append(label, input);
+    container.appendChild(grupo);
+  });
+}
+
+function popularSelectEquipesModal() {
+  const select = document.getElementById('crud_equipe');
+  if (!select) return;
+  select.innerHTML = '<option value="">Nenhuma (Agente Livre)</option>';
+  [...equipesData]
+    .sort((a, b) => a.nome.localeCompare(b.nome))
+    .forEach(eq => select.add(new Option(eq.nome, eq.id)));
+}
+
+function mostrarErroModal(mensagens) {
+  const caixa = document.getElementById('crud_erros');
+  if (!caixa) return;
+  caixa.textContent = '';
+  if (!mensagens || mensagens.length === 0) {
+    caixa.hidden = true;
+    return;
+  }
+  mensagens.forEach(texto => {
+    const linha = document.createElement('div');
+    linha.textContent = `• ${texto}`; // textContent: mensagens do servidor nunca viram HTML
+    caixa.appendChild(linha);
+  });
+  caixa.hidden = false;
+}
+
+function prepararModal(modo, titulo, textoBotao) {
+  const form = document.getElementById('form_crud_piloto');
+  const tituloModal = document.getElementById('modal_titulo');
   const btnSalvar = document.getElementById('btn_salvar_piloto');
 
-  // Garante que o dropdown de equipes está populado (como no botão Novo)
-  if (selectEq && selectEq.options.length <= 1) {
-    equipesData.forEach(eq => selectEq.add(new Option(eq.nome, eq.id)));
+  form.reset();
+  mostrarErroModal([]);
+  popularSelectEquipesModal();
+
+  form.dataset.modo = modo;
+  if (modo === 'criar') delete form.dataset.idEdicao;
+  if (tituloModal) tituloModal.textContent = titulo;
+  if (btnSalvar) btnSalvar.textContent = textoBotao;
+  return form;
+}
+
+function abrirModalNovo() {
+  prepararModal('criar', 'Cadastrar Novo Piloto', 'Salvar Piloto');
+  document.getElementById('modal_piloto').showModal();
+}
+
+function configurarModalPiloto() {
+  if (modalPilotoConfigurado) return; // evita listeners duplicados
+  const modal = document.getElementById('modal_piloto');
+  const form = document.getElementById('form_crud_piloto');
+  const btnNovo = document.getElementById('btn_novo_piloto');
+  if (!modal || !form) return;
+
+  montarCamposAtributos();
+
+  if (btnNovo) btnNovo.addEventListener('click', abrirModalNovo);
+  document.getElementById('btn_fechar_modal')?.addEventListener('click', () => modal.close());
+  document.getElementById('btn_cancelar_modal')?.addEventListener('click', () => modal.close());
+  form.addEventListener('submit', salvarPiloto);
+
+  modalPilotoConfigurado = true;
+}
+
+// Lê o formulário e monta o corpo JSON enviado à API
+function lerFormularioPiloto() {
+  const valor = (id) => document.getElementById(id).value;
+  const atributos = {};
+  ATRIBUTOS_CONFIG.forEach(cfg => {
+    atributos[cfg.chave] = Number(valor(`crud_attr_${cfg.chave}`));
+  });
+
+  const corpo = {
+    nome: valor('crud_nome').trim(),
+    pais: valor('crud_pais').trim(),
+    idade: Number(valor('crud_idade')),
+    salario_anual: Number(valor('crud_salario')),
+    equipe_id: valor('crud_equipe') ? Number(valor('crud_equipe')) : null,
+    series_preference: valor('crud_serie'),
+    pay_driver: document.getElementById('crud_pay_driver').checked,
+    marketability: Number(valor('crud_marketability')),
+    atributos
+  };
+  if (valor('crud_potencial') !== '') corpo.estrelas_potencial = Number(valor('crud_potencial'));
+  return corpo;
+}
+
+// Único tratador de submit: decide entre POST (novo) e PUT (edição) pelo modo do formulário
+async function salvarPiloto(evento) {
+  evento.preventDefault();
+  const form = evento.currentTarget;
+  const token = localStorage.getItem('jwt_token');
+  if (!token) {
+    alert('Sessão expirada. Faça login novamente.');
+    return;
   }
 
-  // 3. Preenche os formulários com os dados do piloto
-  if (formCrud) {
-    document.getElementById('crud_nome').value = pilotoSelecionado.nome || '';
-    document.getElementById('crud_pais').value = pilotoSelecionado.nacionalidade || pilotoSelecionado.pais || '';
-    document.getElementById('crud_idade').value = pilotoSelecionado.idade || '';
-    document.getElementById('crud_salario').value = pilotoSelecionado.salario_anual || '';
-    document.getElementById('crud_overall').value = pilotoSelecionado.overrall || '';
-    
-    if (selectEq) {
-      selectEq.value = pilotoSelecionado.equipe_id || '';
+  const editando = form.dataset.modo === 'editar' && form.dataset.idEdicao;
+  const url = editando ? `${API_URL}/pilotos/${form.dataset.idEdicao}` : `${API_URL}/pilotos`;
+  const btnSalvar = document.getElementById('btn_salvar_piloto');
+  const textoOriginal = btnSalvar ? btnSalvar.textContent : '';
+
+  if (btnSalvar) {
+    btnSalvar.disabled = true;
+    btnSalvar.textContent = 'Salvando...';
+  }
+  mostrarErroModal([]);
+
+  try {
+    const resposta = await fetch(url, {
+      method: editando ? 'PUT' : 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify(lerFormularioPiloto())
+    });
+    const data = await resposta.json().catch(() => ({}));
+
+    if (resposta.status === 401) {
+      alert('Sessão expirada. Faça login novamente.');
+      return window.fazerLogout();
+    }
+    if (!resposta.ok) {
+      const detalhes = Array.isArray(data.erros) ? data.erros.map(e => e.mensagem) : [];
+      mostrarErroModal(detalhes.length ? detalhes : [data.mensagem || 'Falha ao salvar o piloto.']);
+      return;
     }
 
-    // Marca o formulário com o ID do piloto (usaremos isso para saber que é um PUT, não um POST)
-    formCrud.dataset.modo = 'editar';
-    formCrud.dataset.idEdicao = id;
+    document.getElementById('modal_piloto').close();
+    await recarregarTela();
+    alert(editando ? 'Piloto atualizado com sucesso!' : 'Piloto cadastrado com sucesso!');
+  } catch (err) {
+    mostrarErroModal([`Não foi possível falar com o servidor: ${err.message}`]);
+  } finally {
+    if (btnSalvar) {
+      btnSalvar.disabled = false;
+      btnSalvar.textContent = textoOriginal;
+    }
   }
+}
 
-  // 4. Adapta os textos para o modo "Edição"
-  if (tituloModal) tituloModal.textContent = 'Editar Piloto';
-  if (btnSalvar) btnSalvar.textContent = 'Atualizar Piloto';
+// Ação de EDITAR (PUT): abre o mesmo modal já preenchido com os dados atuais do piloto
+window.editarPiloto = function(id) {
+  const token = localStorage.getItem('jwt_token');
+  if (!token) return alert('Sessão expirada. Faça login novamente.');
 
-  // 5. Abre a janela para o usuário!
-  if (modal) modal.showModal();
+  const piloto = pilotosData.find(p => String(p.id) === String(id));
+  if (!piloto) return alert('Erro: piloto não encontrado na base.');
+
+  configurarModalPiloto();
+  const form = prepararModal('editar', `Editar Piloto: ${piloto.nome}`, 'Atualizar Piloto');
+  form.dataset.idEdicao = String(piloto.id);
+
+  const definir = (campo, valor) => { document.getElementById(campo).value = valor ?? ''; };
+  definir('crud_nome', piloto.nome);
+  definir('crud_pais', piloto.pais || piloto.nacionalidade);
+  definir('crud_idade', piloto.idade);
+  definir('crud_salario', piloto.salario_anual);
+  definir('crud_equipe', piloto.equipe_id);
+  definir('crud_serie', piloto.series_preference || 'Any');
+  definir('crud_marketability', parseInt(String(piloto.marketability), 10) || 0);
+  definir('crud_potencial', piloto.estrelas_potencial);
+  document.getElementById('crud_pay_driver').checked = Boolean(piloto.pay_driver);
+
+  ATRIBUTOS_CONFIG.forEach(cfg => {
+    definir(`crud_attr_${cfg.chave}`, obterValorAtributo(piloto, cfg));
+  });
+
+  document.getElementById('modal_piloto').showModal();
 };

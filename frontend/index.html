@@ -266,28 +266,30 @@
 
     <script src="script.js"></script>
 
-    <!-- MODAL DE CRUD: Adicionar/Editar Piloto -->
+    <!-- MODAL DE CRUD: Adicionar/Editar Piloto (o mesmo formulário atende POST e PUT) -->
   <dialog id="modal_piloto" class="modal_crud">
     <div class="modal_header">
       <h2 id="modal_titulo">Cadastrar Novo Piloto</h2>
       <button type="button" id="btn_fechar_modal" aria-label="Fechar modal">&times;</button>
     </div>
-    
+
     <form id="form_crud_piloto">
+      <div id="crud_erros" class="msg_erro_modal" role="alert" hidden></div>
+
       <div class="form_grid">
         <div class="form_group">
           <label for="crud_nome">Nome Completo *</label>
-          <input type="text" id="crud_nome" required placeholder="Ex: Lucas Mendes">
+          <input type="text" id="crud_nome" required minlength="2" maxlength="100" placeholder="Ex: Lucas Mendes">
         </div>
-        
+
         <div class="form_group">
           <label for="crud_pais">País de Origem *</label>
-          <input type="text" id="crud_pais" required placeholder="Ex: Brasil">
+          <input type="text" id="crud_pais" required minlength="2" maxlength="60" placeholder="Ex: Brasil">
         </div>
 
         <div class="form_group">
           <label for="crud_idade">Idade *</label>
-          <input type="number" id="crud_idade" required min="16" max="60" placeholder="Ex: 24">
+          <input type="number" id="crud_idade" required min="16" max="60" step="1" placeholder="Ex: 24">
         </div>
 
         <div class="form_group">
@@ -296,18 +298,45 @@
         </div>
 
         <div class="form_group">
-          <label for="crud_overall">Nota Overall (0 a 100) *</label>
-          <input type="number" id="crud_overall" required min="0" max="100" placeholder="Ex: 85">
-        </div>
-
-        <div class="form_group">
           <label for="crud_equipe">Equipe Atual</label>
           <select id="crud_equipe">
             <option value="">Nenhuma (Agente Livre)</option>
-            <!-- As equipes serão injetadas aqui pelo JS depois -->
+            <!-- As equipes são carregadas de GET /api/equipes pelo JS -->
           </select>
         </div>
+
+        <div class="form_group">
+          <label for="crud_serie">Série Preferida</label>
+          <select id="crud_serie">
+            <option value="Any">Qualquer</option>
+            <option value="Single Seater">Single Seater</option>
+            <option value="GT">GT</option>
+            <option value="Endurance">Endurance</option>
+          </select>
+        </div>
+
+        <div class="form_group">
+          <label for="crud_marketability">Apelo Comercial (0 a 100) *</label>
+          <input type="number" id="crud_marketability" required min="0" max="100" step="1" value="0">
+        </div>
+
+        <div class="form_group">
+          <label for="crud_potencial">Potencial (0 a 5 estrelas)</label>
+          <input type="number" id="crud_potencial" min="0" max="5" step="0.1" placeholder="Automático">
+        </div>
+
+        <div class="form_group form_group_check">
+          <label for="crud_pay_driver">
+            <input type="checkbox" id="crud_pay_driver"> Piloto pagante (traz aporte financeiro)
+          </label>
+        </div>
       </div>
+
+      <fieldset class="form_fieldset">
+        <legend>Atributos técnicos (0 a 20)</legend>
+        <div id="crud_atributos" class="form_atributos"></div>
+        <small class="form_dica">As estrelas de habilidade são recalculadas pela média dos atributos quando algum deles muda.</small>
+      </fieldset>
 
       <div class="modal_actions">
         <button type="button" id="btn_cancelar_modal" class="btn_secundario">Cancelar</button>
