@@ -8,7 +8,7 @@ const {
   ATRIBUTOS, validarPiloto, mesclarPiloto, resolverEstrelas, calcularEstrelasAtuais, validarId
 } = require('../src/utils/validators');
 
-const JWT_SECRET = process.env.JWT_SECRET || 'chave_mestra_motorsport_2026';
+const JWT_SECRET = process.env.JWT_SECRET; // definido no .env (o servidor nem inicia sem ele)
 
 const atributosValidos = (valor = 15) => Object.fromEntries(ATRIBUTOS.map((c) => [c, valor]));
 const pilotoValido = (extra = {}) => ({

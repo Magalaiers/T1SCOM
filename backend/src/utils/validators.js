@@ -155,7 +155,72 @@ function resolverEstrelas(dados, existente) {
   return { estrelas_atuais: atuais, estrelas_potencial: potencial };
 }
 
+// ---------------------------------------------------------------------
+// Autenticação: cadastro e login
+// ---------------------------------------------------------------------
+const REGEX_EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+function validarRegistro(entrada) {
+  if (!ehObjeto(entrada)) {
+    return { valido: false, dados: null, erros: [{ campo: 'body', mensagem: 'Corpo da requisição inválido.' }] };
+  }
+  const erros = [];
+  const dados = {};
+  const erro = (campo, mensagem) => erros.push({ campo, mensagem });
+
+  // Nome de usuário (também serve para login): sem "@", para nunca se confundir com um e-mail
+  if (typeof entrada.nome !== 'string') {
+    erro('nome', 'Nome de usuário é obrigatório e deve ser um texto.');
+  } else {
+    const nome = limparTexto(entrada.nome);
+    if (nome.length < 3 || nome.length > 60) erro('nome', 'Nome de usuário deve ter entre 3 e 60 caracteres.');
+    else if (nome.includes('@')) erro('nome', 'Nome de usuário não pode conter "@".');
+    else dados.nome = nome;
+  }
+
+  // E-mail
+  if (typeof entrada.email !== 'string') {
+    erro('email', 'E-mail é obrigatório e deve ser um texto.');
+  } else {
+    const email = entrada.email.trim().toLowerCase();
+    if (email.length > 120 || !REGEX_EMAIL.test(email)) erro('email', 'Informe um e-mail válido (até 120 caracteres).');
+    else dados.email = email;
+  }
+
+  // Senha: 8 a 72 bytes (limite do bcrypt), com ao menos uma letra e um número
+  if (typeof entrada.senha !== 'string') {
+    erro('senha', 'Senha é obrigatória e deve ser um texto.');
+  } else if (entrada.senha.length < 8 || Buffer.byteLength(entrada.senha, 'utf8') > 72) {
+    erro('senha', 'A senha deve ter entre 8 e 72 caracteres.');
+  } else if (!/[A-Za-z]/.test(entrada.senha) || !/\d/.test(entrada.senha)) {
+    erro('senha', 'A senha deve conter pelo menos uma letra e um número.');
+  } else dados.senha = entrada.senha;
+
+  return { valido: erros.length === 0, dados: erros.length === 0 ? dados : null, erros };
+}
+
+// Login: o campo continua se chamando "email" no JSON (o frontend envia assim),
+// mas aceita e-mail OU nome de usuário.
+function validarLogin(entrada) {
+  if (!ehObjeto(entrada)) {
+    return { valido: false, dados: null, erros: [{ campo: 'body', mensagem: 'Corpo da requisição inválido.' }] };
+  }
+  const erros = [];
+  const dados = {};
+
+  if (typeof entrada.email !== 'string' || entrada.email.trim().length < 1 || entrada.email.trim().length > 120) {
+    erros.push({ campo: 'email', mensagem: 'Informe o e-mail ou nome de usuário (até 120 caracteres).' });
+  } else dados.identificador = entrada.email.trim();
+
+  if (typeof entrada.senha !== 'string' || entrada.senha.length < 1 || entrada.senha.length > 128) {
+    erros.push({ campo: 'senha', mensagem: 'Informe a senha (até 128 caracteres).' });
+  } else dados.senha = entrada.senha;
+
+  return { valido: erros.length === 0, dados: erros.length === 0 ? dados : null, erros };
+}
+
 module.exports = {
   ATRIBUTOS, SERIES, STATUS_CONTRATO,
-  validarId, validarPiloto, mesclarPiloto, resolverEstrelas, calcularEstrelasAtuais, limparTexto
+  validarId, validarPiloto, mesclarPiloto, resolverEstrelas, calcularEstrelasAtuais, limparTexto,
+  validarRegistro, validarLogin
 };

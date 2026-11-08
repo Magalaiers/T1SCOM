@@ -5,8 +5,8 @@ function erro(res, codigo, mensagem, extras = {}) {
   return res.status(codigo).json({ status: 'erro', mensagem, ...extras });
 }
 
-function erroValidacao(res, erros) {
-  return erro(res, 400, 'Dados inválidos. Corrija os campos indicados.', { erros });
+function erroValidacao(res, erros, mensagem = 'Dados inválidos. Corrija os campos indicados.') {
+  return erro(res, 400, mensagem, { erros });
 }
 
 function erroInterno(res, excecao, mensagem = 'Erro interno no servidor.') {

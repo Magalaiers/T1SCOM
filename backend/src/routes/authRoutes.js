@@ -3,12 +3,12 @@ const router = express.Router();
 const authController = require('../controllers/authController');
 const { autenticarToken } = require('../middlewares/authMiddleware');
 
+// Públicas
 router.post('/login', authController.login);
-router.post('/logout', authController.logout);
 router.post('/registrar', authController.registrar);
 
-// Rota de verificação do usuário logado (exige token)
-const handlerPerfil = authController.obterPerfil || authController.perfil;
-router.get('/perfil', autenticarToken, handlerPerfil);
+// Exigem token
+router.post('/logout', autenticarToken, authController.logout);
+router.get('/perfil', autenticarToken, authController.obterPerfil);
 
 module.exports = router;

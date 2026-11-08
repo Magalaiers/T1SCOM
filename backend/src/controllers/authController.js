@@ -1,186 +1,95 @@
+const crypto = require('crypto');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const db = require('../config/db');
+const { JWT_SECRET, JWT_EXPIRES_IN } = require('../config/jwt');
 const logger = require('../utils/logger');
+const { erro, erroValidacao, erroInterno, sucesso } = require('../utils/respostas');
+const { validarLogin, validarRegistro } = require('../utils/validators');
 
-// Mesma chave de contingência do authMiddleware.js
-const JWT_SECRET = process.env.JWT_SECRET || 'chave_mestra_motorsport_2026';
+// Hash descartável: quando o usuário não existe, ainda executamos um bcrypt.compare
+// para que o tempo de resposta não revele se o e-mail/nome está cadastrado.
+const HASH_FALSO = bcrypt.hashSync(crypto.randomBytes(16).toString('hex'), 10);
 
-// 1. POST /api/auth/login
+// POST /api/auth/login
 exports.login = async (req, res) => {
-  const { email, senha } = req.body;
+  const { valido, erros, dados } = validarLogin(req.body);
+  if (!valido) return erroValidacao(res, erros, erros[0].mensagem);
 
-  if (!email || !senha) {
-    return res.status(400).json({
-      status: 'erro',
-      mensagem: 'Forneça o usuário/e-mail e a senha para autenticar.'
-    });
-  }
+  const { identificador, senha } = dados;
 
   try {
-    // Busca flexível: o campo "email" do frontend agora pode ser o nome de usuário ou e-mail
-    const identificador = email.trim();
-    
-    const [usuarios] = await db.query(
-      'SELECT * FROM usuarios WHERE email = ? OR nome = ?',
-      [identificador.toLowerCase(), identificador]
+    // "@" => busca por e-mail; senão por nome de usuário (o cadastro proíbe "@" no nome)
+    const porEmail = identificador.includes('@');
+    const [usuarios] = await db.execute(
+      `SELECT id, nome, email, senha_hash, perfil FROM usuarios WHERE ${porEmail ? 'email' : 'nome'} = ? LIMIT 1`,
+      [porEmail ? identificador.toLowerCase() : identificador]
     );
-
-    if (usuarios.length === 0) {
-      logger.warn('AUTH', `Falha de autenticação: credencial não encontrada (${identificador})`);
-      return res.status(401).json({
-        status: 'erro',
-        mensagem: 'Credenciais inválidas.'
-      });
-    }
 
     const usuario = usuarios[0];
-    
-    // Identifica o campo de senha da tabela (seja senha_hash ou senha)
-    const hashBanco = usuario.senha_hash || usuario.senha || '';
+    const senhaCorreta = await bcrypt.compare(senha, usuario ? usuario.senha_hash : HASH_FALSO);
 
-    // Validação de senha segura com suporte a bcrypt
-    let senhaCorreta = false;
-    try {
-      senhaCorreta = await bcrypt.compare(senha, hashBanco);
-    } catch (e) {
-      senhaCorreta = false;
+    if (!usuario || !senhaCorreta) {
+      logger.warn('AUTH', `Falha de autenticação para "${identificador.slice(0, 60)}" ip=${req.ip}`);
+      return erro(res, 401, 'Credenciais inválidas.');
     }
 
-    // Suporte para senhas inseridas em texto plano durante o seed inicial
-    if (!senhaCorreta && (senha === hashBanco || senha === usuario.senha)) {
-      senhaCorreta = true;
-    }
+    const payload = { id: usuario.id, nome: usuario.nome, email: usuario.email, perfil: usuario.perfil };
+    const token = jwt.sign(payload, JWT_SECRET, { algorithm: 'HS256', expiresIn: JWT_EXPIRES_IN });
 
-    if (!senhaCorreta) {
-      logger.warn('AUTH', `Falha de autenticação: senha incorreta para o e-mail: ${email}`);
-      return res.status(401).json({
-        status: 'erro',
-        mensagem: 'Credenciais inválidas.'
-      });
-    }
+    logger.info('AUTH', `Login com sucesso: ID ${usuario.id} (${usuario.email}) perfil ${usuario.perfil} ip=${req.ip}`);
 
-    // Normalização do perfil em maiúsculas (ADMIN / MANAGER)
-    const perfilFormatado = String(usuario.perfil || 'ADMIN').toUpperCase().trim();
-
-    // Payload estruturado para o controle RBAC
-    const payload = {
-      id: usuario.id,
-      nome: usuario.nome,
-      email: usuario.email,
-      perfil: perfilFormatado
-    };
-
-    // Assinatura com expiração de 8 horas
-    const token = jwt.sign(payload, JWT_SECRET, { expiresIn: '8h' });
-
-    logger.info('AUTH', `Login com sucesso para ID ${usuario.id} (${usuario.email}) - Perfil: ${perfilFormatado}`);
-
-    return res.status(200).json({
-      status: 'sucesso',
-      mensagem: 'Login realizado com sucesso',
-      token,
-      usuario: {
-        id: usuario.id,
-        nome: usuario.nome,
-        email: usuario.email,
-        perfil: perfilFormatado
-      }
-    });
-
-  } catch (erro) {
-    console.error('DETALHE REAL DO ERRO NO LOGIN:', erro);
-    logger.error('AUTH', `Erro interno durante o login: ${erro.message}`);
-    return res.status(500).json({
-      status: 'erro',
-      mensagem: 'Erro interno no servidor ao processar autenticação.'
-    });
+    return sucesso(res, 200, { mensagem: 'Login realizado com sucesso', token, usuario: payload });
+  } catch (excecao) {
+    logger.error('AUTH', `Erro interno durante o login: ${excecao.message}`);
+    return erroInterno(res, excecao, 'Erro interno no servidor ao processar autenticação.');
   }
 };
 
-// 2. GET /api/auth/perfil
-exports.obterPerfil = async (req, res) => {
-  try {
-    const dadosUsuario = req.usuario || req.user;
-    return res.status(200).json({
-      status: 'sucesso',
-      dados: dadosUsuario
-    });
-  } catch (erro) {
-    logger.error('AUTH', `Erro ao recuperar perfil: ${erro.message}`);
-    return res.status(500).json({
-      status: 'erro',
-      mensagem: 'Erro ao consultar perfil autenticado.'
-    });
-  }
+// GET /api/auth/perfil  (exige token)
+exports.obterPerfil = (req, res) => {
+  const { id, nome, email, perfil } = req.usuario;
+  return sucesso(res, 200, { dados: { id, nome, email, perfil } });
 };
 
-// 3. POST /api/auth/logout
+// POST /api/auth/logout  (exige token)
+// JWT é stateless: o servidor registra o evento e o cliente descarta o token.
 exports.logout = (req, res) => {
-  return res.status(200).json({
-    status: 'sucesso',
-    mensagem: 'Logout realizado com sucesso. Descarte o token no cliente.'
-  });
+  logger.info('AUTH', `Logout: ID ${req.usuario.id} (${req.usuario.email})`);
+  return sucesso(res, 200, { mensagem: 'Logout realizado com sucesso. Descarte o token no cliente.' });
 };
 
-// POST /api/auth/registrar
+// POST /api/auth/registrar  (sempre cria perfil MANAGER: o cliente não escolhe o perfil)
 exports.registrar = async (req, res) => {
-  const { nome, email, senha } = req.body;
-
-  if (!nome || !email || !senha) {
-    return res.status(400).json({
-      status: 'erro',
-      mensagem: 'Nome, e-mail e senha são obrigatórios.'
-    });
-  }
-
-  if (senha.length < 6) {
-    return res.status(400).json({
-      status: 'erro',
-      mensagem: 'A senha deve conter no mínimo 6 caracteres.'
-    });
-  }
+  const { valido, erros, dados } = validarRegistro(req.body);
+  if (!valido) return erroValidacao(res, erros, erros[0].mensagem);
 
   try {
-    // 1. Verifica se o e-mail ou o nome já existem no banco
-    const [existente] = await db.query(
-      'SELECT id, email, nome FROM usuarios WHERE email = ? OR nome = ?',
-      [email.trim().toLowerCase(), nome.trim()]
+    const [existentes] = await db.execute(
+      'SELECT email, nome FROM usuarios WHERE email = ? OR nome = ?',
+      [dados.email, dados.nome]
     );
 
-    if (existente.length > 0) {
-      // Avalia exatamente qual dado entrou em conflito para dar a mensagem correta
-      const conflitoNome = existente.some(user => user.nome.toLowerCase() === nome.trim().toLowerCase());
-      
-      const mensagemErro = conflitoNome 
+    if (existentes.length > 0) {
+      const nomeEmUso = existentes.some((u) => u.nome.toLowerCase() === dados.nome.toLowerCase());
+      return erro(res, 409, nomeEmUso
         ? 'Este nome de usuário já está em uso. Por favor, escolha outro.'
-        : 'Este e-mail já está cadastrado no sistema.';
-        
-      return res.status(409).json({
-        status: 'erro',
-        mensagem: mensagemErro
-      });
+        : 'Este e-mail já está cadastrado no sistema.');
     }
 
-    const senhaHash = await bcrypt.hash(senha, 10);
-
-    const [resultado] = await db.query(
-      'INSERT INTO usuarios (nome, email, senha_hash, perfil) VALUES (?, ?, ?, "MANAGER")',
-      [nome.trim(), email.trim().toLowerCase(), senhaHash]
+    const senhaHash = await bcrypt.hash(dados.senha, 10);
+    const [resultado] = await db.execute(
+      "INSERT INTO usuarios (nome, email, senha_hash, perfil) VALUES (?, ?, ?, 'MANAGER')",
+      [dados.nome, dados.email, senhaHash]
     );
 
-    logger.info('AUTH', `Novo usuário cadastrado: ${email} (ID: ${resultado.insertId})`);
-
-    return res.status(201).json({
-      status: 'sucesso',
-      mensagem: 'Conta criada com sucesso! Você já pode fazer login.'
-    });
-
-  } catch (erro) {
-    logger.error('AUTH', `Erro ao registrar usuário: ${erro.message}`);
-    return res.status(500).json({
-      status: 'erro',
-      mensagem: 'Erro interno ao processar o cadastro.'
-    });
+    logger.info('AUTH', `Novo usuário cadastrado: ${dados.email} (ID ${resultado.insertId})`);
+    return sucesso(res, 201, { mensagem: 'Conta criada com sucesso! Você já pode fazer login.' });
+  } catch (excecao) {
+    if (excecao.code === 'ER_DUP_ENTRY') {
+      return erro(res, 409, 'Este e-mail já está cadastrado no sistema.');
+    }
+    logger.error('AUTH', `Erro ao registrar usuário: ${excecao.message}`);
+    return erroInterno(res, excecao, 'Erro interno ao processar o cadastro.');
   }
 };

@@ -57,12 +57,11 @@ document.addEventListener('DOMContentLoaded', () => {
   
       } catch (err) {
         mostrarFeedback(err.message, 'erro');
-        btn.disabled = false;
-        btn.textContent = 'Entrar no Sistema';
+          btn.disabled = false;
+          btn.textContent = 'Entrar no Sistema';
       }
     });
   
-    // 2. Processar CADASTRO
   // 2. Processar CADASTRO
   formCadastro.addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -120,15 +119,14 @@ document.addEventListener('DOMContentLoaded', () => {
       }, 3500);
     }
   });
+
+  function mostrarFeedback(texto, tipo) {
+    boxFeedback.textContent = texto;
+    boxFeedback.className = `alerta_feedback alerta_${tipo}`;
+  }
   
-    function mostrarFeedback(texto, tipo) {
-      boxFeedback.textContent = texto;
-      boxFeedback.className = `alerta_feedback alerta_${tipo}`;
-    }
-  
-    function limparFeedback() {
-      boxFeedback.textContent = '';
-      boxFeedback.className = 'alerta_feedback';
-      boxFeedback.style.display = 'none';
-    }
-  });
+  function limparFeedback() {
+    boxFeedback.textContent = '';
+    boxFeedback.className = 'alerta_feedback'; // a classe já esconde a caixa (display: none no CSS)
+  }
+});
