@@ -1,16 +1,15 @@
+// backend/src/routes/pilotoRoutes.js
 const express = require('express');
 const router = express.Router();
 const pilotoController = require('../controllers/pilotoController');
 const { autenticarToken, autorizarPerfis } = require('../middlewares/authMiddleware');
 
-// Rotas de leitura
+// Rotas Públicas (Visitante)
 router.get('/', pilotoController.listarPilotos);
-router.get('/:id', pilotoController.obterPiloto);
 
-// Rotas de Escrita
-router.post('/', autenticarToken, autorizarPerfis('ADMIN'), pilotoController.criarPiloto);
-router.put('/:id', autenticarToken, autorizarPerfis('ADMIN'), pilotoController.atualizarPiloto);
-router.delete('/:id', autenticarToken, autorizarPerfis('ADMIN'), pilotoController.deletarPiloto);
+// Rotas Restritas ao CRUD do Plantel (Manager e Admin)
+router.post('/', autenticarToken, autorizarPerfis(['ADMIN', 'MANAGER']), pilotoController.criarPiloto);
+router.put('/:id', autenticarToken, autorizarPerfis(['ADMIN', 'MANAGER']), pilotoController.atualizarPiloto);
+router.delete('/:id', autenticarToken, autorizarPerfis(['ADMIN', 'MANAGER']), pilotoController.deletarPiloto);
 
 module.exports = router;
-

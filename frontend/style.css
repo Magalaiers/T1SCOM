@@ -925,3 +925,109 @@ main {
         gap: 0.25rem;
     }
 }
+
+/* =========================================
+   ESTILOS DO MODAL (CRUD DE PILOTOS)
+   ========================================= */
+   .modal_crud {
+    margin: auto;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background-color: var(--bg-surface);
+    color: var(--text-main);
+    padding: 0;
+    width: 90%;
+    max-width: 600px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+  }
+  
+  /* Fundo escurecido atrás do modal */
+  .modal_crud::backdrop {
+    background-color: rgba(0, 0, 0, 0.75);
+    backdrop-filter: blur(4px);
+  }
+  
+  .modal_header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1.25rem 1.5rem;
+    border-bottom: 1px solid var(--border);
+    background-color: var(--bg-card);
+  }
+  
+  .modal_header h2 {
+    font-size: 1.25rem;
+    color: var(--accent);
+    margin: 0;
+  }
+  
+  #btn_fechar_modal {
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    font-size: 1.5rem;
+    cursor: pointer;
+    transition: color 0.2s;
+  }
+  
+  #btn_fechar_modal:hover {
+    color: var(--accent);
+  }
+  
+  #form_crud_piloto {
+    padding: 1.5rem;
+  }
+  
+  .form_grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.25rem;
+    margin-bottom: 1.5rem;
+  }
+  
+  .modal_actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 1rem;
+    border-top: 1px solid var(--border);
+    padding-top: 1.25rem;
+  }
+  
+  .btn_secundario {
+    background-color: transparent;
+    color: var(--text-main);
+    border: 1px solid var(--border);
+    padding: 0.75rem 1.5rem;
+    border-radius: var(--radius);
+    cursor: pointer;
+    font-weight: 600;
+    transition: background-color 0.2s;
+  }
+  
+  .btn_secundario:hover {
+    background-color: var(--bg-card);
+  }
+  
+  /* Responsividade do modal */
+  @media (max-width: 600px) {
+    .form_grid {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  .card_acoes_crud {
+  display: flex;
+  gap: 0.5rem;
+}
+.card_acoes_crud button {
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  cursor: pointer;
+  padding: 0.2rem 0.4rem;
+  font-size: 1rem;
+  transition: background 0.2s;
+}
+.btn_editar_piloto:hover { background-color: var(--accent-gold); }
+.btn_excluir_piloto:hover { background-color: var(--accent); }

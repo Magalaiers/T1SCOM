@@ -51,6 +51,10 @@
             </div>
         </section>
 
+        <div id="painel_admin" style="display: none; justify-content: flex-end; margin-bottom: 1rem;">
+            <button id="btn_novo_piloto" class="btn_acao" style="background-color: var(--accent-green); border-color: var(--accent-green);">+ Cadastrar Novo Piloto</button>
+        </div>
+
         <section id="grid_catalogo" aria-labelledby="titulo_catalogo">
             <div class="catalogo_header">
                 <h2 id="titulo_catalogo">Catálogo de Pilotos</h2>
@@ -261,5 +265,55 @@
     </footer>
 
     <script src="script.js"></script>
+
+    <!-- MODAL DE CRUD: Adicionar/Editar Piloto -->
+  <dialog id="modal_piloto" class="modal_crud">
+    <div class="modal_header">
+      <h2 id="modal_titulo">Cadastrar Novo Piloto</h2>
+      <button type="button" id="btn_fechar_modal" aria-label="Fechar modal">&times;</button>
+    </div>
+    
+    <form id="form_crud_piloto">
+      <div class="form_grid">
+        <div class="form_group">
+          <label for="crud_nome">Nome Completo *</label>
+          <input type="text" id="crud_nome" required placeholder="Ex: Lucas Mendes">
+        </div>
+        
+        <div class="form_group">
+          <label for="crud_pais">País de Origem *</label>
+          <input type="text" id="crud_pais" required placeholder="Ex: Brasil">
+        </div>
+
+        <div class="form_group">
+          <label for="crud_idade">Idade *</label>
+          <input type="number" id="crud_idade" required min="16" max="60" placeholder="Ex: 24">
+        </div>
+
+        <div class="form_group">
+          <label for="crud_salario">Salário Anual ($) *</label>
+          <input type="number" id="crud_salario" required min="0" step="1000" placeholder="Ex: 1500000">
+        </div>
+
+        <div class="form_group">
+          <label for="crud_overall">Nota Overall (0 a 100) *</label>
+          <input type="number" id="crud_overall" required min="0" max="100" placeholder="Ex: 85">
+        </div>
+
+        <div class="form_group">
+          <label for="crud_equipe">Equipe Atual</label>
+          <select id="crud_equipe">
+            <option value="">Nenhuma (Agente Livre)</option>
+            <!-- As equipes serão injetadas aqui pelo JS depois -->
+          </select>
+        </div>
+      </div>
+
+      <div class="modal_actions">
+        <button type="button" id="btn_cancelar_modal" class="btn_secundario">Cancelar</button>
+        <button type="submit" id="btn_salvar_piloto" class="btn_acao">Salvar Piloto</button>
+      </div>
+    </form>
+  </dialog>
 </body>
 </html>
