@@ -6,6 +6,7 @@ const logger = require('../utils/logger');
 const { erro, erroValidacao, erroInterno, sucesso } = require('../utils/respostas');
 const { validarLogin, validarRegistro } = require('../utils/validators');
 const usuarioRepo = require('../repositories/usuarioRepository');
+const tokenRepo = require('../repositories/tokenRepository');
 const pilotoRepo = require('../repositories/pilotoRepository');
 const { comTransacao } = require('../repositories/transacao');
 
@@ -33,7 +34,8 @@ exports.login = async (req, res) => {
     }
 
     const payload = { id: usuario.id, nome: usuario.nome, email: usuario.email, perfil: usuario.perfil };
-    const token = jwt.sign(payload, JWT_SECRET, { algorithm: 'HS256', expiresIn: JWT_EXPIRES_IN });
+    // jwtid: identificador único do token (jti). É ele que o logout revoga.
+    const token = jwt.sign(payload, JWT_SECRET, { algorithm: 'HS256', expiresIn: JWT_EXPIRES_IN, jwtid: crypto.randomUUID() });
 
     logger.info('AUTH', `Login com sucesso: ID ${usuario.id} (${usuario.email}) perfil ${usuario.perfil} ip=${req.ip}`);
 
@@ -51,10 +53,17 @@ exports.obterPerfil = (req, res) => {
 };
 
 // POST /api/auth/logout  (exige token)
-// JWT é stateless: o servidor registra o evento e o cliente descarta o token.
-exports.logout = (req, res) => {
-  logger.info('AUTH', `Logout: ID ${req.usuario.id} (${req.usuario.email})`);
-  return sucesso(res, 200, { mensagem: 'Logout realizado com sucesso. Descarte o token no cliente.' });
+// O token usado na requisição é revogado no servidor: a partir daqui qualquer uso dele retorna 401,
+// mesmo antes de expirar. Outros tokens do mesmo usuário (outro login) continuam válidos.
+exports.logout = async (req, res) => {
+  try {
+    await tokenRepo.revogar({ jti: req.token.jti, usuarioId: req.usuario.id, expiraEm: req.token.exp });
+    logger.info('AUTH', `Logout: ID ${req.usuario.id} (${req.usuario.email}), token revogado`);
+    return sucesso(res, 200, { mensagem: 'Logout realizado com sucesso. Este token não pode mais ser usado.' });
+  } catch (excecao) {
+    logger.error('AUTH', `Erro ao revogar o token no logout (usuário ${req.usuario.id}): ${excecao.message}`);
+    return erroInterno(res, excecao, 'Erro interno ao encerrar a sessão.');
+  }
 };
 
 // POST /api/auth/registrar  (sempre cria perfil MANAGER: o cliente não escolhe o perfil)
@@ -84,8 +93,10 @@ exports.registrar = async (req, res) => {
     logger.info('AUTH', `Novo usuário cadastrado: ${dados.email} (ID ${novoId}) com cópia do catálogo`);
     return sucesso(res, 201, { mensagem: 'Conta criada com sucesso! Você já pode fazer login.' });
   } catch (excecao) {
-    if (excecao.code === 'ER_DUP_ENTRY') {
-      return erro(res, 409, 'Este e-mail já está cadastrado no sistema.');
+    if (excecao.code === 'ER_DUP_ENTRY') { // corrida entre dois cadastros: o banco é a última barreira
+      return erro(res, 409, usuarioRepo.campoDuplicado(excecao) === 'nome'
+        ? 'Este nome de usuário já está em uso. Por favor, escolha outro.'
+        : 'Este e-mail já está cadastrado no sistema.');
     }
     logger.error('AUTH', `Erro ao registrar usuário: ${excecao.message}`);
     return erroInterno(res, excecao, 'Erro interno ao processar o cadastro.');

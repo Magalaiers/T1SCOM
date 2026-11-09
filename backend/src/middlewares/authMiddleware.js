@@ -3,12 +3,14 @@ const { JWT_SECRET } = require('../config/jwt');
 const logger = require('../utils/logger');
 const { erro, erroInterno } = require('../utils/respostas');
 const usuarioRepo = require('../repositories/usuarioRepository');
+const tokenRepo = require('../repositories/tokenRepository');
 
 const contexto = (req) => `${req.method} ${req.originalUrl} ip=${req.ip}`;
 
-// Exige "Authorization: Bearer <token>" válido e não expirado.
+// Exige "Authorization: Bearer <token>" válido, não expirado e não revogado pelo logout.
 // Depois de validar o token, confirma NO BANCO que o usuário ainda existe e usa o perfil atual dele
 // (o perfil escrito dentro do token não é confiável: pode estar desatualizado).
+// Deixa em req.token o identificador (jti) e a expiração (exp) do token usado: o logout precisa deles.
 function autenticarToken(req, res, next) {
   const cabecalho = req.headers.authorization;
   const partes = typeof cabecalho === 'string' ? cabecalho.match(/^Bearer\s+(\S+)$/i) : null;
@@ -24,13 +26,25 @@ function autenticarToken(req, res, next) {
       return erro(res, 401, 'Token inválido ou expirado.');
     }
 
+    // Todo token emitido pelo login tem jti e exp. Sem eles não dá para revogar: é recusado.
+    if (typeof payload.jti !== 'string' || !Number.isInteger(payload.exp)) {
+      logger.warn('AUTH', `Acesso negado (token sem identificador jti/exp): ${contexto(req)}`);
+      return erro(res, 401, 'Token inválido ou expirado.');
+    }
+
     try {
+      if (await tokenRepo.estaRevogado(payload.jti)) {
+        logger.warn('AUTH', `Acesso negado (token revogado pelo logout, usuário ID ${payload.id}): ${contexto(req)}`);
+        return erro(res, 401, 'Sessão encerrada. Faça login novamente.');
+      }
+
       const usuario = Number.isInteger(payload.id) ? await usuarioRepo.buscarPorId(payload.id) : null;
       if (!usuario) {
         logger.warn('AUTH', `Acesso negado (usuário do token não existe mais, ID ${payload.id}): ${contexto(req)}`);
         return erro(res, 401, 'Sessão inválida: o usuário não existe mais. Faça login novamente.');
       }
       req.usuario = { id: usuario.id, nome: usuario.nome, email: usuario.email, perfil: usuario.perfil };
+      req.token = { jti: payload.jti, exp: payload.exp };
       return next();
     } catch (excecao) {
       logger.error('AUTH', `Erro ao validar o usuário do token: ${excecao.message}`);
