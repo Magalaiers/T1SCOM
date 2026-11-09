@@ -1119,3 +1119,215 @@ main {
     grid-template-columns: 1fr 1fr;
   }
 }
+
+
+
+/* =========================================
+   MINHA EQUIPE (painel do MANAGER)
+   ========================================= */
+.minha_equipe {
+  background-color: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.5rem;
+  margin-bottom: 2rem;
+}
+
+.minha_equipe > h2 {
+  margin: 0 0 1rem;
+}
+
+.equipe_vazia {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.equipe_vazia p {
+  margin: 0;
+  color: var(--text-muted);
+  max-width: 60ch;
+}
+
+.equipe_cabecalho {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-bottom: 1.25rem;
+}
+
+.equipe_identidade {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  flex-wrap: wrap;
+}
+
+.equipe_badge {
+  padding: 0.45rem 1rem;
+  border-radius: var(--radius);
+  font-weight: 700;
+  font-size: 1.05rem;
+}
+
+.equipe_meta {
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+
+.equipe_acoes {
+  display: flex;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+
+.btn_perigo {
+  border-color: var(--accent);
+  color: #ff6b6b;
+}
+
+.equipe_kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 0.9rem;
+  margin-bottom: 1.25rem;
+}
+
+.equipe_kpi {
+  background-color: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.9rem 1rem;
+}
+
+.equipe_kpi span {
+  display: block;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-muted);
+  margin-bottom: 0.3rem;
+}
+
+.equipe_kpi strong {
+  font-size: 1.3rem;
+}
+
+.equipe_contratar {
+  display: flex;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  margin-bottom: 1rem;
+}
+
+.equipe_contratar input {
+  flex: 1 1 260px;
+  min-width: 0;
+  background-color: var(--bg-surface);
+  color: var(--text-main);
+  border: 1px solid var(--border);
+  padding: 0.7rem 1rem;
+  border-radius: var(--radius);
+  font-family: inherit;
+}
+
+.equipe_tabela_wrap {
+  overflow-x: auto;
+}
+
+.equipe_tabela {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.92rem;
+}
+
+.equipe_tabela th,
+.equipe_tabela td {
+  text-align: left;
+  padding: 0.6rem 0.75rem;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+
+.equipe_tabela th {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-muted);
+}
+
+.equipe_elenco_vazio {
+  color: var(--text-muted);
+  text-align: center !important;
+  white-space: normal !important;
+}
+
+.btn_dispensar {
+  background: transparent;
+  color: #ff6b6b;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.3rem 0.7rem;
+  cursor: pointer;
+}
+
+.btn_dispensar:hover {
+  border-color: var(--accent);
+}
+
+.modal_crud input[type="color"] {
+  width: 100%;
+  height: 2.6rem;
+  padding: 0.2rem;
+  background-color: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+
+/* Minha Equipe: tela de escolha (assumir uma equipe oficial ou criar a própria) */
+.equipe_escolha {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1rem;
+}
+
+.equipe_opcao {
+  background-color: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.equipe_opcao h3 {
+  margin: 0;
+}
+
+.equipe_opcao p {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 0.92rem;
+}
+
+.equipe_opcao select {
+  width: 100%;
+}
+
+.equipe_aviso {
+  margin: 0 0 1rem;
+  color: var(--accent-gold);
+  font-size: 0.9rem;
+}
+
+.equipe_contratar input:disabled,
+.equipe_contratar button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

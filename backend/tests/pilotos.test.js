@@ -168,20 +168,29 @@ describe('API de pilotos', () => {
   });
 
   it('8. Edição de atributos e equipe: persiste, recalcula as estrelas e atualiza o status do contrato', async () => {
+    // As equipes oficiais começam completas: abre uma vaga dispensando um piloto e devolve no final
+    const membro = (await request(app).get('/api/pilotos')).body.dados.find((p) => p.equipe_id === equipeId);
+    expect((await request(app).put(`/api/pilotos/${membro.id}`).set(auth(tokenAdmin)).send({ equipe_id: null })).status).toBe(200);
+
     const criado = (await criar()).body.dados;
-    expect(criado.status_contrato).toBe('Disponivel');
+    try {
+      expect(criado.status_contrato).toBe('Disponivel');
 
-    const r = await request(app).put(`/api/pilotos/${criado.id}`).set(auth(tokenAdmin))
-      .send({ nome: 'Nome Editado', equipe_id: equipeId, atributos: atributosValidos(20) });
-    expect(r.status).toBe(200);
+      const r = await request(app).put(`/api/pilotos/${criado.id}`).set(auth(tokenAdmin))
+        .send({ nome: 'Nome Editado', equipe_id: equipeId, atributos: atributosValidos(20) });
+      expect(r.status).toBe(200);
 
-    const lido = (await request(app).get(`/api/pilotos/${criado.id}`)).body.dados;
-    expect(lido.nome).toBe('Nome Editado');
-    expect(lido.equipe_id).toBe(equipeId);
-    expect(lido.status_contrato).toBe('Contratado');
-    expect(lido.atributos.curva).toBe(20);
-    expect(lido.estrelas_atuais).toBe(5);
-    expect(lido.overrall).toBe(100);
+      const lido = (await request(app).get(`/api/pilotos/${criado.id}`)).body.dados;
+      expect(lido.nome).toBe('Nome Editado');
+      expect(lido.equipe_id).toBe(equipeId);
+      expect(lido.status_contrato).toBe('Contratado');
+      expect(lido.atributos.curva).toBe(20);
+      expect(lido.estrelas_atuais).toBe(5);
+      expect(lido.overrall).toBe(100);
+    } finally {
+      await request(app).put(`/api/pilotos/${criado.id}`).set(auth(tokenAdmin)).send({ equipe_id: null });
+      await request(app).put(`/api/pilotos/${membro.id}`).set(auth(tokenAdmin)).send({ equipe_id: equipeId });
+    }
   });
 
   it('9. Edição inválida (atributo 25) retorna 400 e não altera o registro', async () => {

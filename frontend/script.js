@@ -1,5 +1,7 @@
 let pilotosData = [];
 let equipesData = [];
+let campeonatosData = [];
+let minhaEquipe = null; // { equipe, resumo, elenco } do MANAGER logado, ou null se ainda não criou
 
 // Estado Global da Listagem e Paginação
 let paginaAtual = 1;
@@ -79,10 +81,13 @@ async function carregarDados() {
   }
 }
 
-
+// Equipes (alimentam o seletor de equipe do formulário de cadastro/edição)
 async function carregarEquipes() {
   try {
-    const resposta = await fetch(`${API_URL}/equipes`);
+    const token = localStorage.getItem('jwt_token');
+    let resposta = await fetch(`${API_URL}/equipes`, token ? { headers: { 'Authorization': `Bearer ${token}` } } : {});
+    // Sessão inválida: carregarDados() encerra a sessão local; aqui só carrega como visitante
+    if (resposta.status === 401 && token) resposta = await fetch(`${API_URL}/equipes`);
     if (!resposta.ok) throw new Error('Falha ao carregar equipes');
     const corpo = await resposta.json();
     equipesData = corpo.dados || [];
@@ -255,9 +260,10 @@ function inicializarControles() {
 
 // Recarrega dados do servidor e atualiza toda a interface (usado após criar/editar/excluir)
 async function recarregarTela() {
-  await carregarDados();
+  await Promise.all([carregarDados(), carregarEquipes()]);
   popularControles();
   renderizarCatalogo();
+  await carregarMinhaEquipe();
 }
 
 // 5. Filtragem, Ordenação e Renderização do Plantel
@@ -657,6 +663,12 @@ function gerenciarSessaoInterface() {
       const btnRestaurar = document.getElementById('btn_restaurar_dados');
       if (perfilUsuario === 'MANAGER') {
         if (aviso) aviso.textContent = 'Você está vendo e editando a sua cópia pessoal dos pilotos.';
+        const painelEquipe = document.getElementById('painel_minha_equipe');
+        if (painelEquipe) {
+          painelEquipe.style.display = 'block';
+          configurarModalEquipe();
+          carregarMinhaEquipe();
+        }
         if (btnRestaurar) {
           btnRestaurar.style.display = 'inline-block';
           btnRestaurar.addEventListener('click', restaurarMeusDados);
@@ -677,7 +689,7 @@ function gerenciarSessaoInterface() {
 async function restaurarMeusDados() {
   const token = localStorage.getItem('jwt_token');
   if (!token) return alert('Sessão expirada. Faça login novamente.');
-  if (!confirm('Isso apaga TODAS as suas alterações (pilotos criados, editados e excluídos) e restaura o catálogo original. Deseja continuar?')) return;
+  if (!confirm('Isso apaga TODAS as suas alterações (pilotos criados, editados e excluídos), faz você deixar a equipe que comanda (se for uma equipe criada por você, ela é excluída) e restaura o catálogo original. Deseja continuar?')) return;
 
   try {
     const resposta = await fetch(`${API_URL}/pilotos/restaurar`, {
@@ -771,17 +783,27 @@ function montarCamposAtributos() {
   });
 }
 
-function popularSelectEquipesModal() {
+// Equipes completas aparecem desabilitadas (a API também recusa); a equipe atual do piloto continua escolhível
+function popularSelectEquipesModal(equipeAtualId = null) {
   const select = document.getElementById('crud_equipe');
   if (!select) return;
   select.innerHTML = '<option value="">Nenhuma (Agente Livre)</option>';
+
+  const ocupacao = contarPilotosPorEquipe();
   [...equipesData]
-    .sort((a, b) => a.nome.localeCompare(b.nome))
-    .forEach(eq => select.add(new Option(eq.nome, eq.id)));
+    .sort((a, b) => (Number(b.propria) - Number(a.propria)) || a.nome.localeCompare(b.nome))
+    .forEach(eq => {
+      const ocupadas = ocupacao[eq.id] || 0;
+      const completa = ocupadas >= eq.elenco_maximo && eq.id !== equipeAtualId;
+      const rotulo = `${eq.propria ? '★ ' : ''}${eq.nome}${eq.propria ? ' (minha equipe)' : ''} — ${ocupadas}/${eq.elenco_maximo}${completa ? ' (completa)' : ''}`;
+      const opcao = new Option(rotulo, eq.id);
+      opcao.disabled = completa;
+      select.add(opcao);
+    });
 }
 
-function mostrarErroModal(mensagens) {
-  const caixa = document.getElementById('crud_erros');
+function mostrarErroModal(mensagens, idCaixa = 'crud_erros') {
+  const caixa = document.getElementById(idCaixa);
   if (!caixa) return;
   caixa.textContent = '';
   if (!mensagens || mensagens.length === 0) {
@@ -796,14 +818,14 @@ function mostrarErroModal(mensagens) {
   caixa.hidden = false;
 }
 
-function prepararModal(modo, titulo, textoBotao) {
+function prepararModal(modo, titulo, textoBotao, equipeAtualId = null) {
   const form = document.getElementById('form_crud_piloto');
   const tituloModal = document.getElementById('modal_titulo');
   const btnSalvar = document.getElementById('btn_salvar_piloto');
 
   form.reset();
   mostrarErroModal([]);
-  popularSelectEquipesModal();
+  popularSelectEquipesModal(equipeAtualId);
 
   form.dataset.modo = modo;
   if (modo === 'criar') delete form.dataset.idEdicao;
@@ -921,7 +943,7 @@ window.editarPiloto = function(id) {
   if (!piloto) return alert('Erro: piloto não encontrado na base.');
 
   configurarModalPiloto();
-  const form = prepararModal('editar', `Editar Piloto: ${piloto.nome}`, 'Atualizar Piloto');
+  const form = prepararModal('editar', `Editar Piloto: ${piloto.nome}`, 'Atualizar Piloto', piloto.equipe_id);
   form.dataset.idEdicao = String(piloto.id);
 
   const definir = (campo, valor) => { document.getElementById(campo).value = valor ?? ''; };
@@ -941,3 +963,309 @@ window.editarPiloto = function(id) {
 
   document.getElementById('modal_piloto').showModal();
 };
+
+// ==========================================
+// --- 12. MINHA EQUIPE (MANAGER)           ---
+// ==========================================
+// O MANAGER comanda UMA equipe: uma oficial do jogo (assumida) ou uma que ele criou.
+let modalEquipeConfigurado = false;
+
+const formatarDolar = (valor) => `US$ ${Number(valor || 0).toLocaleString('pt-BR')}`;
+
+// Chamada autenticada à API. Em caso de erro lança Error com .status e .lista (mensagens por campo).
+async function chamarApi(metodo, caminho, corpo) {
+  const token = localStorage.getItem('jwt_token');
+  const resposta = await fetch(`${API_URL}${caminho}`, {
+    method: metodo,
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+    body: corpo === undefined ? undefined : JSON.stringify(corpo)
+  });
+  const data = await resposta.json().catch(() => ({}));
+  if (!resposta.ok) {
+    const falha = new Error(data.mensagem || 'Falha na requisição.');
+    falha.status = resposta.status;
+    falha.lista = Array.isArray(data.erros) ? data.erros.map(e => e.mensagem) : [];
+    throw falha;
+  }
+  return data;
+}
+
+const textoDoErro = (err) => (err.lista && err.lista.length ? err.lista.join(' ') : err.message);
+
+async function carregarCampeonatos() {
+  try {
+    const resposta = await fetch(`${API_URL}/campeonatos`);
+    if (!resposta.ok) throw new Error('Falha ao carregar campeonatos');
+    campeonatosData = (await resposta.json()).dados || [];
+  } catch (erro) {
+    console.error('Falha ao carregar campeonatos:', erro);
+    campeonatosData = [];
+  }
+}
+
+// Busca a equipe que o MANAGER comanda (404 = nenhuma) e redesenha o painel
+async function carregarMinhaEquipe() {
+  const token = localStorage.getItem('jwt_token');
+  if (!token || localStorage.getItem('usuario_perfil') !== 'MANAGER') {
+    minhaEquipe = null;
+    return;
+  }
+
+  try {
+    const resposta = await fetch(`${API_URL}/equipes/minha`, { headers: { 'Authorization': `Bearer ${token}` } });
+    if (resposta.status === 404) minhaEquipe = null;
+    else if (resposta.ok) minhaEquipe = (await resposta.json()).dados;
+    else throw new Error('Falha ao carregar a equipe');
+  } catch (erro) {
+    console.error('Falha ao carregar a equipe:', erro);
+    minhaEquipe = null;
+  }
+  renderizarMinhaEquipe();
+}
+
+// Quantos pilotos (da cópia do usuário) há em cada equipe: { equipeId: quantidade }
+function contarPilotosPorEquipe() {
+  const contagem = {};
+  pilotosData.forEach(p => {
+    if (p.equipe_id) contagem[p.equipe_id] = (contagem[p.equipe_id] || 0) + 1;
+  });
+  return contagem;
+}
+
+function renderizarMinhaEquipe() {
+  if (minhaEquipe) renderizarEquipeComandada();
+  else renderizarEscolhaDeEquipe();
+}
+
+// Estado 1: ainda não comanda nenhuma equipe -> assumir uma oficial ou criar a própria
+function renderizarEscolhaDeEquipe() {
+  const conteudo = document.getElementById('conteudo_minha_equipe');
+  if (!conteudo) return;
+
+  const ocupacao = contarPilotosPorEquipe();
+  const oficiais = equipesData.filter(e => !e.propria).sort((a, b) => a.nome.localeCompare(b.nome));
+  const opcoes = oficiais
+    .map(e => `<option value="${Number(e.id)}">${esc(e.nome)} — ${esc(e.nome_campeonato)} (${ocupacao[e.id] || 0}/${Number(e.elenco_maximo)} pilotos)</option>`)
+    .join('');
+
+  conteudo.innerHTML = `
+    <div class="equipe_escolha">
+      <div class="equipe_opcao">
+        <h3>Assumir uma equipe do jogo</h3>
+        <p>Comande uma das ${oficiais.length} equipes existentes e gerencie o elenco dela.</p>
+        <select id="select_assumir" aria-label="Equipe a assumir">${opcoes}</select>
+        <button type="button" id="btn_assumir" class="btn_acao">Assumir esta equipe</button>
+      </div>
+      <div class="equipe_opcao">
+        <h3>Criar a minha equipe</h3>
+        <p>Monte uma equipe nova: escolha nome, país, campeonato e cores. O tamanho do elenco depende do campeonato.</p>
+        <button type="button" id="btn_criar_equipe" class="btn_acao">+ Criar minha equipe</button>
+      </div>
+    </div>`;
+
+  document.getElementById('btn_assumir').addEventListener('click', assumirEquipe);
+  document.getElementById('btn_criar_equipe').addEventListener('click', () => abrirModalEquipe('criar'));
+}
+
+// Estados 2 e 3: comandando uma equipe oficial ou uma criada pelo usuário
+function renderizarEquipeComandada() {
+  const conteudo = document.getElementById('conteudo_minha_equipe');
+  if (!conteudo) return;
+
+  const { equipe, resumo, elenco } = minhaEquipe;
+  const criada = equipe.tipo === 'criada';
+  const completo = resumo.total_pilotos >= equipe.elenco_maximo;
+  const cor1 = corSegura(equipe.cor_primaria, '#383e4d');
+  const cor2 = corSegura(equipe.cor_secundaria, '#ffffff');
+
+  // Sugestões de contratação: pilotos da cópia do usuário que ainda não estão na equipe
+  const idsNoElenco = new Set(elenco.map(p => p.id));
+  const sugestoes = pilotosData
+    .filter(p => !idsNoElenco.has(p.id))
+    .map(p => `<option value="${esc(`${p.nome} — ${p.equipe_id ? p.nome_equipe : 'Agente livre'} [#${p.id}]`)}"></option>`)
+    .join('');
+
+  const linhas = elenco.length
+    ? elenco.map(p => `
+        <tr>
+          <td>${esc(p.nome)}${p.pay_driver ? ' <span class="badge_pay_driver" title="Piloto traz aporte financeiro">Pagante</span>' : ''}</td>
+          <td>${esc(p.pais)}</td>
+          <td>${Number(p.idade)}</td>
+          <td>${p.estrelas_atuais.toFixed(1)} ★ <small>(pot. ${p.estrelas_potencial.toFixed(1)})</small></td>
+          <td>${formatarDolar(p.salario_anual)}</td>
+          <td><button type="button" class="btn_dispensar" data-id="${Number(p.id)}">Dispensar</button></td>
+        </tr>`).join('')
+    : '<tr><td colspan="6" class="equipe_elenco_vazio">Elenco vazio. Contrate pilotos pelo campo acima.</td></tr>';
+
+  const acoes = criada
+    ? `<button type="button" id="btn_editar_equipe" class="btn_secundario">Editar equipe</button>
+       <button type="button" id="btn_deixar_equipe" class="btn_secundario btn_perigo">Excluir equipe</button>`
+    : `<button type="button" id="btn_deixar_equipe" class="btn_secundario btn_perigo">Deixar a equipe</button>`;
+
+  conteudo.innerHTML = `
+    <div class="equipe_cabecalho">
+      <div class="equipe_identidade">
+        <span class="equipe_badge" style="background:${cor1}; color:${cor2};">${esc(equipe.nome)}</span>
+        <span class="equipe_meta">${esc(equipe.pais)} • ${esc(equipe.nome_campeonato)} • ${criada ? 'Criada por você' : 'Equipe oficial'}</span>
+      </div>
+      <div class="equipe_acoes">${acoes}</div>
+    </div>
+
+    <div class="equipe_kpis">
+      <div class="equipe_kpi"><span>Elenco</span><strong>${resumo.total_pilotos}/${equipe.elenco_maximo}</strong></div>
+      <div class="equipe_kpi"><span>Folha salarial / ano</span><strong>${formatarDolar(resumo.folha_salarial)}</strong></div>
+      <div class="equipe_kpi"><span>Média de estrelas</span><strong>${resumo.media_estrelas.toFixed(1)} ★</strong> <small>(pot. ${resumo.media_potencial.toFixed(1)})</small></div>
+      <div class="equipe_kpi"><span>Pilotos pagantes</span><strong>${resumo.pilotos_pagantes}</strong></div>
+    </div>
+
+    <div class="equipe_contratar">
+      <input type="search" id="busca_contratar" list="lista_contratar" placeholder="${completo ? 'Elenco completo' : 'Digite o nome de um piloto para contratar...'}" autocomplete="off" ${completo ? 'disabled' : ''}>
+      <datalist id="lista_contratar">${sugestoes}</datalist>
+      <button type="button" id="btn_contratar" class="btn_acao" ${completo ? 'disabled' : ''}>Contratar</button>
+    </div>
+    ${completo ? `<p class="equipe_aviso">Elenco completo (${resumo.total_pilotos}/${equipe.elenco_maximo}). Dispense um piloto para contratar outro.</p>` : ''}
+
+    <div class="equipe_tabela_wrap">
+      <table class="equipe_tabela">
+        <thead><tr><th>Piloto</th><th>País</th><th>Idade</th><th>Estrelas</th><th>Salário</th><th></th></tr></thead>
+        <tbody>${linhas}</tbody>
+      </table>
+    </div>`;
+
+  document.getElementById('btn_deixar_equipe').addEventListener('click', deixarEquipe);
+  document.getElementById('btn_editar_equipe')?.addEventListener('click', () => abrirModalEquipe('editar'));
+  document.getElementById('btn_contratar').addEventListener('click', contratarPiloto);
+  document.getElementById('busca_contratar').addEventListener('keydown', (e) => { if (e.key === 'Enter') contratarPiloto(); });
+  conteudo.querySelectorAll('.btn_dispensar').forEach(botao => {
+    botao.addEventListener('click', () => dispensarPiloto(Number(botao.dataset.id)));
+  });
+}
+
+async function assumirEquipe() {
+  const equipeId = Number(document.getElementById('select_assumir').value);
+  if (!equipeId) return;
+  try {
+    await chamarApi('POST', '/equipes/minha/assumir', { equipe_id: equipeId });
+    await recarregarTela();
+  } catch (err) {
+    alert('Não foi possível assumir a equipe: ' + textoDoErro(err));
+  }
+}
+
+// Move um piloto para a equipe (ou para agente livre, com equipeId = null) usando o PUT de pilotos
+const moverPilotoParaEquipe = (pilotoId, equipeId) => chamarApi('PUT', `/pilotos/${pilotoId}`, { equipe_id: equipeId });
+
+async function contratarPiloto() {
+  const campo = document.getElementById('busca_contratar');
+  const achado = String(campo.value).match(/\[#(\d+)\]\s*$/); // o id vem no fim do texto escolhido na lista
+  if (!achado) return alert('Escolha um piloto na lista de sugestões (digite parte do nome e selecione).');
+
+  try {
+    await moverPilotoParaEquipe(Number(achado[1]), minhaEquipe.equipe.id);
+    await recarregarTela();
+  } catch (err) {
+    alert('Não foi possível contratar: ' + textoDoErro(err));
+  }
+}
+
+async function dispensarPiloto(pilotoId) {
+  if (!confirm('Dispensar este piloto? Ele volta a ser agente livre.')) return;
+  try {
+    await moverPilotoParaEquipe(pilotoId, null);
+    await recarregarTela();
+  } catch (err) {
+    alert('Não foi possível dispensar: ' + textoDoErro(err));
+  }
+}
+
+// Equipe oficial: só deixa de comandá-la. Equipe criada: é excluída e o elenco vira agentes livres.
+async function deixarEquipe() {
+  const { equipe, resumo } = minhaEquipe;
+  const pergunta = equipe.tipo === 'criada'
+    ? `Excluir a sua equipe? Os ${resumo.total_pilotos} piloto(s) do elenco voltam a ser agentes livres.`
+    : `Deixar de comandar ${equipe.nome}? O elenco continua como está.`;
+  if (!confirm(pergunta)) return;
+
+  try {
+    const data = await chamarApi('DELETE', '/equipes/minha');
+    await recarregarTela();
+    alert(data.mensagem);
+  } catch (err) {
+    alert('Erro: ' + textoDoErro(err));
+  }
+}
+
+function configurarModalEquipe() {
+  if (modalEquipeConfigurado) return; // evita listeners duplicados
+  const modal = document.getElementById('modal_equipe');
+  const form = document.getElementById('form_equipe');
+  if (!modal || !form) return;
+
+  document.getElementById('btn_fechar_modal_equipe').addEventListener('click', () => modal.close());
+  document.getElementById('btn_cancelar_modal_equipe').addEventListener('click', () => modal.close());
+  form.addEventListener('submit', salvarEquipe);
+  modalEquipeConfigurado = true;
+}
+
+async function abrirModalEquipe(modo) {
+  configurarModalEquipe();
+  if (campeonatosData.length === 0) await carregarCampeonatos();
+
+  const form = document.getElementById('form_equipe');
+  form.reset();
+  mostrarErroModal([], 'equipe_erros');
+  form.dataset.modo = modo;
+
+  const seletor = document.getElementById('equipe_campeonato');
+  seletor.innerHTML = '';
+  campeonatosData.forEach(c => seletor.add(new Option(`${c.nome} (${c.tipo} ${c.categoria}) — elenco de até ${c.elenco_maximo} pilotos`, c.id)));
+
+  const editando = modo === 'editar' && minhaEquipe;
+  document.getElementById('modal_equipe_titulo').textContent = editando ? 'Editar minha equipe' : 'Criar minha equipe';
+  if (editando) {
+    const { equipe } = minhaEquipe;
+    document.getElementById('equipe_nome').value = equipe.nome;
+    document.getElementById('equipe_pais').value = equipe.pais;
+    seletor.value = String(equipe.campeonato_id);
+    document.getElementById('equipe_cor_primaria').value = corSegura(equipe.cor_primaria, '#383e4d').slice(0, 7);
+    document.getElementById('equipe_cor_secundaria').value = corSegura(equipe.cor_secundaria, '#ffffff').slice(0, 7);
+  }
+  document.getElementById('modal_equipe').showModal();
+}
+
+// Único tratador do formulário: POST (criar) ou PUT (editar), conforme o modo do modal
+async function salvarEquipe(evento) {
+  evento.preventDefault();
+  const form = evento.currentTarget;
+  if (!localStorage.getItem('jwt_token')) return alert('Sessão expirada. Faça login novamente.');
+
+  const editando = form.dataset.modo === 'editar';
+  const botao = document.getElementById('btn_salvar_equipe');
+  const textoOriginal = botao.textContent;
+  botao.disabled = true;
+  botao.textContent = 'Salvando...';
+  mostrarErroModal([], 'equipe_erros');
+
+  try {
+    await chamarApi(editando ? 'PUT' : 'POST', '/equipes/minha', {
+      nome: document.getElementById('equipe_nome').value.trim(),
+      pais: document.getElementById('equipe_pais').value.trim(),
+      campeonato_id: Number(document.getElementById('equipe_campeonato').value),
+      cor_primaria: document.getElementById('equipe_cor_primaria').value,
+      cor_secundaria: document.getElementById('equipe_cor_secundaria').value
+    });
+
+    document.getElementById('modal_equipe').close();
+    await recarregarTela();
+    alert(editando ? 'Equipe atualizada com sucesso!' : 'Equipe criada com sucesso!');
+  } catch (err) {
+    if (err.status === 401) {
+      alert('Sessão expirada. Faça login novamente.');
+      return window.fazerLogout();
+    }
+    mostrarErroModal(err.lista && err.lista.length ? err.lista : [err.message], 'equipe_erros');
+  } finally {
+    botao.disabled = false;
+    botao.textContent = textoOriginal;
+  }
+}

@@ -6,6 +6,7 @@ const logger = require('./src/utils/logger');
 const authRoutes = require('./src/routes/authRoutes');
 const pilotoRoutes = require('./src/routes/pilotoRoutes');
 const equipeRoutes = require('./src/routes/equipeRoutes');
+const campeonatoRoutes = require('./src/routes/campeonatoRoutes');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -17,6 +18,7 @@ app.use(express.json());
 app.use('/api/auth', authRoutes);
 app.use('/api/pilotos', pilotoRoutes);
 app.use('/api/equipes', equipeRoutes);
+app.use('/api/campeonatos', campeonatoRoutes);
 
 app.get('/api/status', (req, res) => {
   res.status(200).json({ status: 'API operacional', timestamp: new Date().toISOString() });

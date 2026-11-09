@@ -80,6 +80,26 @@ async function excluirTodosDoDono(donoId, conexao = db) {
   return resultado.affectedRows;
 }
 
+// Ao apagar uma equipe, os pilotos dela voltam a ser agentes livres (equipe nula e status coerente).
+// Retorna quantos pilotos foram liberados.
+async function liberarDaEquipe(equipeId, donoId, conexao = db) {
+    const [resultado] = await conexao.execute(
+      "UPDATE pilotos SET equipe_id = NULL, status_contrato = 'Disponivel' WHERE equipe_id = ? AND dono_id <=> ?",
+      [equipeId, donoId]
+    );
+return resultado.affectedRows;
+}
+  
+  // Quantos pilotos desse dono estão na equipe (usado para respeitar o limite de elenco)
+async function contarNaEquipe(equipeId, donoId) {
+    const [[linha]] = await db.execute(
+        'SELECT COUNT(*) AS total FROM pilotos WHERE equipe_id = ? AND dono_id <=> ?',
+    [equipeId, donoId]
+    );
+    return Number(linha.total);
+}
+  
 module.exports = {
-  listar, buscarPorId, inserir, atualizar, excluir, copiarCatalogoPara, excluirTodosDoDono
+    listar, buscarPorId, inserir, atualizar, excluir, copiarCatalogoPara, excluirTodosDoDono,
+    liberarDaEquipe, contarNaEquipe
 };

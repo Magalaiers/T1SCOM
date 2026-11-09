@@ -219,8 +219,55 @@ function validarLogin(entrada) {
   return { valido: erros.length === 0, dados: erros.length === 0 ? dados : null, erros };
 }
 
+// ---------------------------------------------------------------------
+// Equipe própria do MANAGER
+// ---------------------------------------------------------------------
+const REGEX_COR = /^#[0-9a-fA-F]{6}$/;
+const COR_PRIMARIA_PADRAO = '#383e4d';
+const COR_SECUNDARIA_PADRAO = '#ffffff';
+const CAMPOS_EDITAVEIS_EQUIPE = ['nome', 'pais', 'campeonato_id', 'cor_primaria', 'cor_secundaria'];
+
+function validarEquipe(entrada) {
+  if (!ehObjeto(entrada)) {
+    return { valido: false, dados: null, erros: [{ campo: 'body', mensagem: 'Corpo da requisição inválido.' }] };
+  }
+  const erros = [];
+  const dados = {};
+  const erro = (campo, mensagem) => erros.push({ campo, mensagem });
+
+  [['nome', 'Nome da equipe', 2, 80], ['pais', 'País', 2, 60]].forEach(([campo, rotulo, min, max]) => {
+    if (typeof entrada[campo] !== 'string') return erro(campo, `${rotulo} é obrigatório e deve ser um texto.`);
+    const limpo = limparTexto(entrada[campo]);
+    if (limpo.length < min || limpo.length > max) return erro(campo, `${rotulo} deve ter entre ${min} e ${max} caracteres.`);
+    dados[campo] = limpo;
+  });
+
+  if (!Number.isInteger(entrada.campeonato_id) || entrada.campeonato_id < 1) {
+    erro('campeonato_id', 'Campeonato é obrigatório (identificador inteiro positivo).');
+  } else dados.campeonato_id = entrada.campeonato_id;
+
+  [['cor_primaria', 'Cor primária', COR_PRIMARIA_PADRAO], ['cor_secundaria', 'Cor secundária', COR_SECUNDARIA_PADRAO]]
+    .forEach(([campo, rotulo, padrao]) => {
+      const valor = entrada[campo] === undefined ? padrao : entrada[campo];
+      if (typeof valor !== 'string' || !REGEX_COR.test(valor)) erro(campo, `${rotulo} deve estar no formato #rrggbb.`);
+      else dados[campo] = valor.toLowerCase();
+    });
+
+  return { valido: erros.length === 0, dados: erros.length === 0 ? dados : null, erros };
+}
+
+// Edição parcial da equipe: campos omitidos mantêm o valor atual
+function mesclarEquipe(existente, corpo) {
+  if (!ehObjeto(corpo)) return corpo;
+  const mesclado = { ...existente };
+  CAMPOS_EDITAVEIS_EQUIPE.forEach((campo) => {
+    if (temChave(corpo, campo)) mesclado[campo] = corpo[campo];
+  });
+  return mesclado;
+}
+
 module.exports = {
   ATRIBUTOS, SERIES, STATUS_CONTRATO,
   validarId, validarPiloto, mesclarPiloto, resolverEstrelas, calcularEstrelasAtuais, limparTexto,
-  validarRegistro, validarLogin
+  validarRegistro, validarLogin, validarEquipe, mesclarEquipe
 };

@@ -75,6 +75,7 @@ async function popularBancoDeDados() {
 
     await conexao.query('SET FOREIGN_KEY_CHECKS = 0');
     await conexao.query('TRUNCATE TABLE pilotos');
+    await conexao.query('TRUNCATE TABLE equipe_comandada');
     await conexao.query('TRUNCATE TABLE equipes');
     await conexao.query('TRUNCATE TABLE campeonatos');
     await conexao.query('SET FOREIGN_KEY_CHECKS = 1');

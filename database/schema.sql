@@ -15,6 +15,7 @@ CREATE DATABASE IF NOT EXISTS motorsport_db
 
 USE motorsport_db;
 
+DROP TABLE IF EXISTS equipe_comandada;
 DROP TABLE IF EXISTS pilotos;
 DROP TABLE IF EXISTS equipes;
 DROP TABLE IF EXISTS campeonatos;
@@ -43,18 +44,52 @@ CREATE TABLE campeonatos (
 
 -- ---------------------------------------------------------------------
 -- Equipes
+--
+-- `dono_id` define de quem é a equipe:
+--   NULL             = equipe oficial do jogo (compartilhada, somente leitura)
+--   id de um MANAGER = equipe criada por ele (só ele a enxerga)
+-- UNIQUE (dono_id) garante NO MÁXIMO UMA equipe criada por MANAGER (as oficiais
+-- têm dono_id NULL, e o MySQL aceita vários NULL num índice único).
+-- Ao excluir o usuário, a equipe dele é apagada junto (ON DELETE CASCADE).
 -- ---------------------------------------------------------------------
 CREATE TABLE equipes (
     id              INT AUTO_INCREMENT PRIMARY KEY,
-    nome            VARCHAR(80) NOT NULL UNIQUE,
+    nome            VARCHAR(80) NOT NULL,
     pais            VARCHAR(60) NOT NULL,
     campeonato_id   INT NOT NULL,
     cor_primaria    CHAR(7) NOT NULL DEFAULT '#383e4d',
     cor_secundaria  CHAR(7) NOT NULL DEFAULT '#ffffff',
+    dono_id         INT NULL,
     CONSTRAINT fk_equipes_campeonato
         FOREIGN KEY (campeonato_id) REFERENCES campeonatos(id)
         ON UPDATE CASCADE
-        ON DELETE RESTRICT
+        ON DELETE RESTRICT,
+    CONSTRAINT fk_equipes_dono
+        FOREIGN KEY (dono_id) REFERENCES usuarios(id)
+        ON UPDATE CASCADE
+        ON DELETE CASCADE,
+    CONSTRAINT uq_equipes_uma_por_dono UNIQUE (dono_id)
+);
+
+-- ---------------------------------------------------------------------
+-- Equipe comandada: qual equipe cada MANAGER está comandando.
+-- A PK em usuario_id garante NO MÁXIMO UMA equipe comandada por usuário.
+-- A equipe pode ser oficial (compartilhada, nunca é alterada por isso) ou a que o
+-- próprio MANAGER criou. Sair da equipe = apagar a linha; apagar a equipe ou o
+-- usuário apaga a linha junto (ON DELETE CASCADE).
+-- ---------------------------------------------------------------------
+CREATE TABLE equipe_comandada (
+    usuario_id  INT PRIMARY KEY,
+    equipe_id   INT NOT NULL,
+    desde       TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_comandada_usuario
+        FOREIGN KEY (usuario_id) REFERENCES usuarios(id)
+        ON UPDATE CASCADE
+        ON DELETE CASCADE,
+    CONSTRAINT fk_comandada_equipe
+        FOREIGN KEY (equipe_id) REFERENCES equipes(id)
+        ON UPDATE CASCADE
+        ON DELETE CASCADE
 );
 
 -- ---------------------------------------------------------------------
@@ -130,6 +165,7 @@ CREATE TABLE pilotos (
 -- ---------------------------------------------------------------------
 -- Índices (além dos criados automaticamente por PK, UNIQUE e FK)
 -- ---------------------------------------------------------------------
+CREATE INDEX idx_equipes_nome     ON equipes(nome);
 CREATE INDEX idx_pilotos_overrall ON pilotos(overrall);
 CREATE INDEX idx_pilotos_nome     ON pilotos(nome);
 CREATE INDEX idx_pilotos_status   ON pilotos(status_contrato);

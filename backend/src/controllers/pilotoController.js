@@ -6,11 +6,23 @@ const {
 const pilotoRepo = require('../repositories/pilotoRepository');
 const equipeRepo = require('../repositories/equipeRepository');
 const { comTransacao } = require('../repositories/transacao');
+const { donoDoEscopo } = require('../utils/escopo');
 
-// De quem são os dados que esta requisição enxerga e altera:
-//  - MANAGER logado -> a cópia pessoal dele (dono = id do usuário)
-//  - ADMIN ou visitante -> o catálogo-modelo (dono = null)
-const donoDoEscopo = (req) => (req.usuario && req.usuario.perfil === 'MANAGER' ? req.usuario.id : null);
+// Confere a equipe de destino de um piloto: ela precisa ser visível para quem edita (oficial ou a própria)
+// e ter vaga. O limite só vale ao ENTRAR numa equipe (quem já está nela pode ser editado à vontade).
+// Retorna a mensagem de erro, ou null se estiver tudo certo.
+async function verificarEquipeDestino(equipeId, donoId, equipeAtualId) {
+  const equipe = await equipeRepo.buscarVisivel(equipeId, donoId);
+  if (!equipe) return 'A equipe informada não existe.';
+
+  if (equipeId !== equipeAtualId) {
+    const ocupadas = await pilotoRepo.contarNaEquipe(equipeId, donoId);
+    if (ocupadas >= equipe.elenco_maximo) {
+      return `A equipe ${equipe.nome} está completa (${ocupadas} de ${equipe.elenco_maximo} pilotos). Dispense um piloto antes de contratar outro.`;
+    }
+  }
+  return null;
+}
 
 const lerAtributos = (linha) => Object.fromEntries(ATRIBUTOS.map((c) => [c, linha[c]]));
 
@@ -87,11 +99,12 @@ exports.criarPiloto = async (req, res) => {
   if (!valido) return erroValidacao(res, erros);
 
   try {
-    if (dados.equipe_id !== null && !(await equipeRepo.existe(dados.equipe_id))) {
-      return erroValidacao(res, [{ campo: 'equipe_id', mensagem: 'A equipe informada não existe.' }]);
+    const donoId = donoDoEscopo(req);
+    if (dados.equipe_id !== null) {
+      const problema = await verificarEquipeDestino(dados.equipe_id, donoId, null);
+      if (problema) return erroValidacao(res, [{ campo: 'equipe_id', mensagem: problema }]);
     }
 
-    const donoId = donoDoEscopo(req);
     const estrelas = resolverEstrelas(dados, null);
     const novoId = await pilotoRepo.inserir(dados, estrelas, donoId);
 
@@ -118,8 +131,9 @@ exports.atualizarPiloto = async (req, res) => {
     const { valido, erros, dados } = validarPiloto(mesclarPiloto(existente, req.body));
     if (!valido) return erroValidacao(res, erros);
 
-    if (dados.equipe_id !== null && !(await equipeRepo.existe(dados.equipe_id))) {
-      return erroValidacao(res, [{ campo: 'equipe_id', mensagem: 'A equipe informada não existe.' }]);
+    if (dados.equipe_id !== null) {
+      const problema = await verificarEquipeDestino(dados.equipe_id, donoId, existente.equipe_id);
+      if (problema) return erroValidacao(res, [{ campo: 'equipe_id', mensagem: problema }]);
     }
 
     const estrelas = resolverEstrelas(dados, existente);
@@ -153,17 +167,20 @@ exports.deletarPiloto = async (req, res) => {
 };
 
 // POST /api/pilotos/restaurar  (só MANAGER)
-// Apaga a cópia pessoal do usuário e recebe uma nova do catálogo-modelo, de forma atômica.
+// Volta ao estado inicial, de forma atômica: apaga a cópia pessoal de pilotos, a equipe criada pelo usuário
+// e a equipe que ele comandava, e recebe uma cópia nova do catálogo-modelo.
 exports.restaurarPilotos = async (req, res) => {
   const donoId = req.usuario.id;
   try {
     const total = await comTransacao(async (conexao) => {
       await pilotoRepo.excluirTodosDoDono(donoId, conexao);
+      await equipeRepo.excluirDoDono(donoId, conexao);
+      await equipeRepo.deixarDeComandar(donoId, conexao);
       return pilotoRepo.copiarCatalogoPara(donoId, conexao);
     });
 
     logger.info('PILOTOS', `Dados restaurados para o usuário ID ${donoId}: ${total} pilotos copiados do catálogo`);
-    return sucesso(res, 200, { mensagem: 'Seus pilotos foram restaurados a partir do catálogo-modelo.', dados: { total } });
+    return sucesso(res, 200, { mensagem: 'Seus dados foram restaurados a partir do catálogo-modelo.', dados: { total } });
   } catch (excecao) {
     logger.error('PILOTOS', `Erro ao restaurar dados do usuário ${donoId}: ${excecao.message}`);
     return erroInterno(res, excecao, 'Erro ao restaurar os dados.');
