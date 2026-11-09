@@ -176,7 +176,7 @@ describe('API de autenticação', () => {
     expect(usuario.perfil).toBe('MANAGER');
 
     // token assinado com o segredo certo, mas afirmando ser ADMIN
-    const forjado = jwt.sign({ id: usuario.id, nome: u.nome, email: u.email.toLowerCase(), perfil: 'ADMIN' }, JWT_SECRET, { expiresIn: '1h' });
+    const forjado = jwt.sign({ id: usuario.id, nome: u.nome, email: u.email.toLowerCase(), perfil: 'ADMIN' }, JWT_SECRET, { expiresIn: '1h', jwtid: 'forjado-b13' });
     const r = await request(app).get('/api/auth/perfil').set('Authorization', `Bearer ${forjado}`);
     expect(r.status).toBe(200);
     expect(r.body.dados.perfil).toBe('MANAGER');

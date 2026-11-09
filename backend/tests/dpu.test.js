@@ -148,7 +148,7 @@ describe('Isolamento de dados por usuário', () => {
 
   it('I9. SEGURANÇA: token que afirma ser ADMIN não dá acesso ao catálogo (vale o perfil real do banco)', async () => {
     const nome = nomeUnico('Tentativa de Escalada');
-    const forjado = jwt.sign({ id: ana.id, nome: ana.nome, email: ana.email, perfil: 'ADMIN' }, process.env.JWT_SECRET, { expiresIn: '1h' });
+    const forjado = jwt.sign({ id: ana.id, nome: ana.nome, email: ana.email, perfil: 'ADMIN' }, process.env.JWT_SECRET, { expiresIn: '1h', jwtid: 'forjado-i9' });
 
     const criado = await request(app).post('/api/pilotos').set(auth(forjado)).send(pilotoValido({ nome }));
     expect(criado.status).toBe(201);

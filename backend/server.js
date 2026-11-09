@@ -1,6 +1,6 @@
 require('dotenv').config();
 const express = require('express');
-const cors = require('cors');
+const { criarCors } = require('./src/config/cors');
 const logger = require('./src/utils/logger');
 
 const authRoutes = require('./src/routes/authRoutes');
@@ -12,7 +12,7 @@ const usuarioRoutes = require('./src/routes/usuarioRoutes');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-app.use(cors());
+app.use(criarCors());
 app.use(express.json());
 
 // Registro dos Endpoints

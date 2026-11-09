@@ -44,6 +44,12 @@ async function inserir({ nome, email, senhaHash, perfil }, conexao = db) {
   return resultado.insertId;
 }
 
+// Depois de um ER_DUP_ENTRY: qual restrição UNIQUE foi violada, 'nome' ou 'email'
+// (o nome da restrição aparece na mensagem do banco, no MySQL e no MariaDB)
+function campoDuplicado(excecao) {
+  return /uq_usuarios_nome/.test(excecao.sqlMessage || excecao.message || '') ? 'nome' : 'email';
+}
+
 // ---------------------------------------------------------------------
 // Gestão de usuários (ADMIN). A hash da senha NUNCA é selecionada nestas consultas.
 // ---------------------------------------------------------------------
@@ -98,6 +104,6 @@ async function excluir(id, conexao = db) {
 }
 
 module.exports = {
-  buscarPorEmail, buscarPorNome, buscarPorId, buscarPorEmailOuNome, inserir,
+  buscarPorEmail, buscarPorNome, buscarPorId, buscarPorEmailOuNome, inserir, campoDuplicado,
   listar, contar, buscarComContagens, atualizarPerfil, atualizarSenha, excluir
 };

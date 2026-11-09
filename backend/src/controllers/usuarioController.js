@@ -68,7 +68,9 @@ exports.criarUsuario = async (req, res) => {
     const criado = await usuarioRepo.buscarComContagens(novoId);
     return sucesso(res, 201, { mensagem: 'Usuário criado com sucesso.', dados: usuarioParaResposta(criado) });
   } catch (excecao) {
-    if (excecao.code === 'ER_DUP_ENTRY') return erro(res, 409, 'Este e-mail já está cadastrado.');
+    if (excecao.code === 'ER_DUP_ENTRY') {
+      return erro(res, 409, usuarioRepo.campoDuplicado(excecao) === 'nome' ? 'Este nome de usuário já está em uso.' : 'Este e-mail já está cadastrado.');
+    }
     logger.error('USUARIOS', `Erro ao criar usuário: ${excecao.message}`);
     return erroInterno(res, excecao, 'Erro ao persistir os dados.');
   }

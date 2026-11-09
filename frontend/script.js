@@ -382,7 +382,7 @@ function renderizarCatalogo() {
       </div>
 
       <div class="piloto_info_basica">
-        <span>Idade: <strong>${piloto.idade || 25} anos</strong></span>
+        <span>Idade: <strong>${Number(piloto.idade) || 25} anos</strong></span>
         <span>Origem: <strong>${esc(piloto.nacionalidade || piloto.pais || 'N/A')}</strong></span>
         <span>Salário: <strong>${formatarSalario(piloto.salario_anual)}</strong></span>
         <span>Série: <strong>${esc(piloto.series_preference || 'Any')}</strong></span>
@@ -562,8 +562,8 @@ function renderizarPainelComparativo(p1, p2) {
         </tr>
         <tr>
           <th scope="row">Idade</th>
-          <td class="${resIdade.c1}"><strong>${p1.idade || 25} anos</strong></td>
-          <td class="${resIdade.c2}"><strong>${p2.idade || 25} anos</strong></td>
+          <td class="${resIdade.c1}"><strong>${Number(p1.idade) || 25} anos</strong></td>
+          <td class="${resIdade.c2}"><strong>${Number(p2.idade) || 25} anos</strong></td>
         </tr>
         <tr>
           <th scope="row">Preferência de Série</th>
@@ -577,8 +577,8 @@ function renderizarPainelComparativo(p1, p2) {
         </tr>
         <tr>
           <th scope="row">Negociabilidade</th>
-          <td class="${resNeg.c1}"><strong>${p1.negociabilidade || p1.marketability || '0%'}</strong></td>
-          <td class="${resNeg.c2}"><strong>${p2.negociabilidade || p2.marketability || '0%'}</strong></td>
+          <td class="${resNeg.c1}"><strong>${esc(p1.negociabilidade || p1.marketability || '0%')}</strong></td>
+          <td class="${resNeg.c2}"><strong>${esc(p2.negociabilidade || p2.marketability || '0%')}</strong></td>
         </tr>
         <tr>
           <th scope="row">Salário Anual</th>
