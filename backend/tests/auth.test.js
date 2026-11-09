@@ -167,4 +167,19 @@ describe('API de autenticação', () => {
     expect((await request(app).post('/api/auth/logout')).status).toBe(401);
     expect((await request(app).post('/api/auth/logout').set('Authorization', `Bearer ${token}`)).status).toBe(200);
   });
+
+  
+  it('B13. SEGURANÇA: o perfil escrito dentro do token é ignorado (vale o perfil real do banco)', async () => {
+    const u = novoUsuario();
+    await registrar(u);
+    const { token, usuario } = (await login(u.email, u.senha)).body;
+    expect(usuario.perfil).toBe('MANAGER');
+
+    // token assinado com o segredo certo, mas afirmando ser ADMIN
+    const forjado = jwt.sign({ id: usuario.id, nome: u.nome, email: u.email.toLowerCase(), perfil: 'ADMIN' }, JWT_SECRET, { expiresIn: '1h' });
+    const r = await request(app).get('/api/auth/perfil').set('Authorization', `Bearer ${forjado}`);
+    expect(r.status).toBe(200);
+    expect(r.body.dados.perfil).toBe('MANAGER');
+    expect(token).toEqual(expect.any(String));
+  });
 });

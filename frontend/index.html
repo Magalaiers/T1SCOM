@@ -51,8 +51,12 @@
             </div>
         </section>
 
-        <div id="painel_admin" style="display: none; justify-content: flex-end; margin-bottom: 1rem;">
-            <button id="btn_novo_piloto" class="btn_acao" style="background-color: var(--accent-green); border-color: var(--accent-green);">+ Cadastrar Novo Piloto</button>
+        <div id="painel_admin" style="display: none; justify-content: space-between; align-items: center; gap: 1rem; flex-wrap: wrap; margin-bottom: 1rem;">
+            <p id="aviso_escopo" style="margin: 0; font-size: 0.9rem; color: var(--text-muted);"></p>
+            <div style="display: flex; gap: 0.75rem; flex-wrap: wrap;">
+                <button id="btn_restaurar_dados" class="btn_secundario" style="display: none;" title="Descarta as suas edições e recebe uma cópia nova do catálogo-modelo">Restaurar meus dados</button>
+                <button id="btn_novo_piloto" class="btn_acao" style="background-color: var(--accent-green); border-color: var(--accent-green);">+ Cadastrar Novo Piloto</button>
+            </div>
         </div>
 
         <section id="grid_catalogo" aria-labelledby="titulo_catalogo">

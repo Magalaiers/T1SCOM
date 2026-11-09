@@ -1,87 +1,139 @@
+-- =====================================================================
+-- Motorsport Manager - script de criação do banco (MySQL 8.0.16+ / MariaDB 10.2+)
+--
+-- Uso:  mysql -u <usuario> -p < database/schema.sql
+-- Depois, popular com os dados do Trabalho 1:  cd backend && npm run seed
+--
+-- ATENÇÃO: as tabelas de domínio (campeonatos, equipes, pilotos) são
+-- recriadas a cada execução porque o `seed` as repopula a partir do
+-- dados.json. A tabela `usuarios` é preservada (CREATE IF NOT EXISTS).
+-- =====================================================================
+
 CREATE DATABASE IF NOT EXISTS motorsport_db
   CHARACTER SET utf8mb4
   COLLATE utf8mb4_unicode_ci;
 
 USE motorsport_db;
 
+DROP TABLE IF EXISTS pilotos;
+DROP TABLE IF EXISTS equipes;
+DROP TABLE IF EXISTS campeonatos;
+
+-- ---------------------------------------------------------------------
+-- Usuários (autenticação e perfis de acesso)
+-- ---------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS usuarios (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    nome VARCHAR(100) NOT NULL,
-    email VARCHAR(120) NOT NULL UNIQUE,
-    senha_hash VARCHAR(255) NOT NULL,
-    perfil ENUM('ADMIN', 'MANAGER') NOT NULL DEFAULT 'MANAGER',
-    criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    id          INT AUTO_INCREMENT PRIMARY KEY,
+    nome        VARCHAR(100) NOT NULL,
+    email       VARCHAR(120) NOT NULL UNIQUE,
+    senha_hash  VARCHAR(255) NOT NULL,
+    perfil      ENUM('ADMIN', 'MANAGER') NOT NULL DEFAULT 'MANAGER',
+    criado_em   TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE IF NOT EXISTS campeonatos (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    nome VARCHAR(80) NOT NULL,
-    categoria VARCHAR(50) NOT NULL,
-    numero_etapas INT NOT NULL CHECK (numero_etapas > 0)
+-- ---------------------------------------------------------------------
+-- Campeonatos
+-- ---------------------------------------------------------------------
+CREATE TABLE campeonatos (
+    id         INT AUTO_INCREMENT PRIMARY KEY,
+    nome       VARCHAR(80) NOT NULL UNIQUE,
+    tipo       VARCHAR(30) NOT NULL,   -- Single Seater | GT | Endurance
+    categoria  VARCHAR(50) NOT NULL    -- Tier 1, Tier 2, ...
 );
 
-CREATE TABLE IF NOT EXISTS equipes (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    nome VARCHAR(80) NOT NULL UNIQUE,
-    pais VARCHAR(60) NOT NULL,
-    orcamento_anual DECIMAL(14, 2) NOT NULL CHECK (orcamento_anual >= 0),
-    campeonato_id INT NOT NULL,
+-- ---------------------------------------------------------------------
+-- Equipes
+-- ---------------------------------------------------------------------
+CREATE TABLE equipes (
+    id              INT AUTO_INCREMENT PRIMARY KEY,
+    nome            VARCHAR(80) NOT NULL UNIQUE,
+    pais            VARCHAR(60) NOT NULL,
+    campeonato_id   INT NOT NULL,
+    cor_primaria    CHAR(7) NOT NULL DEFAULT '#383e4d',
+    cor_secundaria  CHAR(7) NOT NULL DEFAULT '#ffffff',
     CONSTRAINT fk_equipes_campeonato
         FOREIGN KEY (campeonato_id) REFERENCES campeonatos(id)
         ON UPDATE CASCADE
         ON DELETE RESTRICT
 );
 
-CREATE TABLE IF NOT EXISTS pilotos (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    nome VARCHAR(100) NOT NULL,
-    pais VARCHAR(60) NOT NULL,
-    idade INT NOT NULL CHECK (idade >= 16 AND idade <= 60),
-    salario_anual DECIMAL(12, 2) NOT NULL CHECK (salario_anual >= 0),
-    overrall INT NOT NULL CHECK (overrall >= 0 AND overrall <= 100),
-    status_contrato ENUM('Ativo', 'Disponivel', 'Em Negociacao') NOT NULL DEFAULT 'Ativo',
-    equipe_id INT NULL,
-    criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+-- ---------------------------------------------------------------------
+-- Pilotos (entidade principal)
+--
+-- `dono_id` define de quem é o registro:
+--   NULL            = catálogo-modelo (gerido pelo ADMIN; é o que o visitante vê)
+--   id de um MANAGER = cópia pessoal desse usuário (criada no cadastro dele)
+-- Ao excluir o usuário, as cópias dele são apagadas junto (ON DELETE CASCADE).
+--
+-- Os 9 atributos técnicos (escala 0-20 do simulador) ficam em colunas
+-- próprias: era a ausência delas que fazia a API devolver o piloto sem
+-- `atributos` e o frontend exibir o valor-padrão para todos.
+-- `overrall` é uma coluna GERADA (0-100) derivada das estrelas atuais,
+-- portanto nunca fica inconsistente com elas.
+-- ---------------------------------------------------------------------
+CREATE TABLE pilotos (
+    id                  INT AUTO_INCREMENT PRIMARY KEY,
+    nome                VARCHAR(100) NOT NULL,
+    pais                VARCHAR(60)  NOT NULL,
+    idade               TINYINT UNSIGNED NOT NULL,
+    salario_anual       DECIMAL(12, 2) NOT NULL DEFAULT 0,
+    series_preference   ENUM('Any', 'Single Seater', 'GT', 'Endurance') NOT NULL DEFAULT 'Any',
+    pay_driver          BOOLEAN NOT NULL DEFAULT FALSE,
+    marketability       TINYINT UNSIGNED NOT NULL DEFAULT 0,
+    status_contrato     ENUM('Contratado', 'Disponivel', 'Em Negociacao') NOT NULL DEFAULT 'Disponivel',
+    equipe_id           INT NULL,
+    dono_id             INT NULL,
+
+    -- Atributos técnicos (0 a 20)
+    frenagem            TINYINT UNSIGNED NOT NULL,
+    curva               TINYINT UNSIGNED NOT NULL,
+    suavidade           TINYINT UNSIGNED NOT NULL,
+    ultrapassagem       TINYINT UNSIGNED NOT NULL,
+    consistencia        TINYINT UNSIGNED NOT NULL,
+    adaptabilidade      TINYINT UNSIGNED NOT NULL,
+    preparo_fisico      TINYINT UNSIGNED NOT NULL,
+    feedback            TINYINT UNSIGNED NOT NULL,
+    foco                TINYINT UNSIGNED NOT NULL,
+
+    estrelas_atuais     DECIMAL(2, 1) NOT NULL,
+    estrelas_potencial  DECIMAL(2, 1) NOT NULL,
+    overrall            TINYINT UNSIGNED GENERATED ALWAYS AS (ROUND(estrelas_atuais * 20)) STORED,
+
+    criado_em           TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    atualizado_em       TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+
     CONSTRAINT fk_pilotos_equipe
         FOREIGN KEY (equipe_id) REFERENCES equipes(id)
         ON UPDATE CASCADE
-        ON DELETE SET NULL
+        ON DELETE SET NULL,
+
+    CONSTRAINT fk_pilotos_dono
+        FOREIGN KEY (dono_id) REFERENCES usuarios(id)
+        ON UPDATE CASCADE
+        ON DELETE CASCADE,
+
+    CONSTRAINT ck_pilotos_idade          CHECK (idade BETWEEN 16 AND 60),
+    CONSTRAINT ck_pilotos_salario        CHECK (salario_anual >= 0),
+    CONSTRAINT ck_pilotos_marketability  CHECK (marketability BETWEEN 0 AND 100),
+    CONSTRAINT ck_pilotos_estrelas       CHECK (estrelas_atuais BETWEEN 0 AND 5
+                                                AND estrelas_potencial BETWEEN 0 AND 5
+                                                AND estrelas_potencial >= estrelas_atuais),
+    CONSTRAINT ck_pilotos_atributos      CHECK (
+        frenagem       BETWEEN 0 AND 20 AND curva          BETWEEN 0 AND 20 AND
+        suavidade      BETWEEN 0 AND 20 AND ultrapassagem  BETWEEN 0 AND 20 AND
+        consistencia   BETWEEN 0 AND 20 AND adaptabilidade BETWEEN 0 AND 20 AND
+        preparo_fisico BETWEEN 0 AND 20 AND feedback       BETWEEN 0 AND 20 AND
+        foco           BETWEEN 0 AND 20
+    )
 );
 
-CREATE INDEX idx_usuarios_email ON usuarios(email);
-CREATE INDEX idx_equipes_campeonato ON equipes(campeonato_id);
-CREATE INDEX idx_pilotos_equipe ON pilotos(equipe_id);
+-- ---------------------------------------------------------------------
+-- Índices (além dos criados automaticamente por PK, UNIQUE e FK)
+-- ---------------------------------------------------------------------
 CREATE INDEX idx_pilotos_overrall ON pilotos(overrall);
+CREATE INDEX idx_pilotos_nome     ON pilotos(nome);
+CREATE INDEX idx_pilotos_status   ON pilotos(status_contrato);
 
-
--- Usuários iniciais para testes (Senhas com hash bcrypt para a Fase de Auth)
--- Senha de teste padrão do hash abaixo: 'senha123'
-INSERT INTO usuarios (nome, email, senha_hash, perfil) VALUES
-('Administrador Geral', 'admin@motorsport.com', '$2a$10$wT/Ym2bE1k4M2bUaIiqnQ.xT8wDk8m7R3uO6x.vO7N.c6bK8a6Z.i', 'ADMIN'),
-('Manager Carlos', 'carlos@manager.com', '$2a$10$wT/Ym2bE1k4M2bUaIiqnQ.xT8wDk8m7R3uO6x.vO7N.c6bK8a6Z.i', 'MANAGER'),
-('Manager Helena', 'helena@manager.com', '$2a$10$wT/Ym2bE1k4M2bUaIiqnQ.xT8wDk8m7R3uO6x.vO7N.c6bK8a6Z.i', 'MANAGER');
-
--- Campeonatos
-INSERT INTO campeonatos (nome, categoria, numero_etapas) VALUES
-('World Motorsport Championship', 'Tier 1', 16),
-('Asia-Pacific Super Cup', 'Tier 2', 12),
-('European Racing Series', 'Tier 3', 10),
-('International GT Championship', 'GT Tier 1', 14),
-('Super GT Cup', 'GT Tier 2', 8);
-
--- Equipes
-INSERT INTO equipes (nome, pais, orcamento_anual, campeonato_id) VALUES
-('Steinmann Motorsport', 'Alemanha', 45000000.00, 1),
-('Scuderia Rossini', 'Itália', 42000000.00, 1),
-('Octane EMG', 'Estados Unidos', 22000000.00, 2),
-('Archer BMR', 'Reino Unido', 12000000.00, 3),
-('Predator Racing Group', 'Itália', 8500000.00, 3);
-
--- Pilotos
-INSERT INTO pilotos (nome, pais, idade, salario_anual, overrall, status_contrato, equipe_id) VALUES
-('Rafael Rodrigues', 'Brasil', 26, 4800000.00, 92, 'Ativo', 1),
-('Ella Saarinen', 'Finlândia', 27, 5400000.00, 95, 'Ativo', 2),
-('Lian Wei', 'China', 22, 1200000.00, 78, 'Ativo', 3),
-('Bjorn Blomqvist', 'Suécia', 29, 950000.00, 74, 'Ativo', 4),
-('Alejandro Silva', 'Espanha', 19, 450000.00, 68, 'Em Negociacao', 5),
-('Chiara Montanari', 'Itália', 23, 3900000.00, 89, 'Disponivel', NULL);
+-- Contas iniciais (admin/manager) NÃO ficam neste script: com senha/hash
+-- escritos aqui elas viram credenciais versionadas no repositório.
+-- O `npm run seed` cria o ADMIN a partir das variáveis do .env.

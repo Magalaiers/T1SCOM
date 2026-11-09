@@ -49,7 +49,17 @@ document.addEventListener('DOMContentLoaded', async () => {
 // 1. Carregamento Assíncrono da Base de Dados MYSQL via API
 async function carregarDados() {
   try {
-    const resposta = await fetch('http://localhost:3000/api/pilotos');
+    // Com login, a API devolve os pilotos do usuário (MANAGER) ou o catálogo-modelo (ADMIN)
+    const token = localStorage.getItem('jwt_token');
+    let resposta = await fetch(`${API_URL}/pilotos`, token ? { headers: { 'Authorization': `Bearer ${token}` } } : {});
+
+    // Token vencido ou usuário removido: encerra a sessão local e carrega como visitante
+    if (resposta.status === 401 && token) {
+      localStorage.removeItem('jwt_token');
+      localStorage.removeItem('usuario_nome');
+      localStorage.removeItem('usuario_perfil');
+      resposta = await fetch(`${API_URL}/pilotos`);
+    }
     if (!resposta.ok) {
       throw new Error('Falha na resposta do servidor Node.js');
     }
@@ -642,12 +652,45 @@ function gerenciarSessaoInterface() {
     if ((perfilUsuario === 'ADMIN' || perfilUsuario === 'MANAGER') && painelAdmin) {
       painelAdmin.style.display = 'flex';
       configurarModalPiloto();
+
+      const aviso = document.getElementById('aviso_escopo');
+      const btnRestaurar = document.getElementById('btn_restaurar_dados');
+      if (perfilUsuario === 'MANAGER') {
+        if (aviso) aviso.textContent = 'Você está vendo e editando a sua cópia pessoal dos pilotos.';
+        if (btnRestaurar) {
+          btnRestaurar.style.display = 'inline-block';
+          btnRestaurar.addEventListener('click', restaurarMeusDados);
+        }
+      } else if (aviso) {
+        aviso.textContent = 'Você está editando o catálogo-modelo (a base copiada para cada novo usuário).';
+      }
     }
   } else {
     // Modo Visitante (Não logado)
     if (authContainer) {
       authContainer.innerHTML = `<a href="login.html" class="btn_login_nav">Entrar / Gerenciar</a>`;
     }
+  }
+}
+
+// Descarta as edições do MANAGER e recebe uma cópia nova do catálogo-modelo
+async function restaurarMeusDados() {
+  const token = localStorage.getItem('jwt_token');
+  if (!token) return alert('Sessão expirada. Faça login novamente.');
+  if (!confirm('Isso apaga TODAS as suas alterações (pilotos criados, editados e excluídos) e restaura o catálogo original. Deseja continuar?')) return;
+
+  try {
+    const resposta = await fetch(`${API_URL}/pilotos/restaurar`, {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    const data = await resposta.json().catch(() => ({}));
+    if (!resposta.ok) throw new Error(data.mensagem || 'Falha ao restaurar os dados.');
+
+    await recarregarTela();
+    alert(`Dados restaurados: ${data.dados.total} pilotos.`);
+  } catch (err) {
+    alert('Erro ao restaurar: ' + err.message);
   }
 }
 
