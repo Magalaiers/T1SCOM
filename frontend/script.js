@@ -603,7 +603,8 @@ function renderizarPainelComparativo(p1, p2) {
 
 // 8. SCROLL SPY - Menu Navegação Ativo
 function atualizarMenuAtivo() {
-  const secoes = document.querySelectorAll('main > section');
+  const secoes = [...document.querySelectorAll('main > section')]
+    .filter(secao => window.getComputedStyle(secao).display !== 'none'); // seção oculta (ex.: Minha Equipe para visitante) não conta
   const links = document.querySelectorAll('.main_nav a');
   let secaoAtualId = '';
 
@@ -666,15 +667,23 @@ function gerenciarSessaoInterface() {
         const painelEquipe = document.getElementById('painel_minha_equipe');
         if (painelEquipe) {
           painelEquipe.style.display = 'block';
+          document.getElementById('nav_minha_equipe')?.removeAttribute('hidden'); // link "Minha Equipe" no menu
           configurarModalEquipe();
           carregarMinhaEquipe();
         }
         if (btnRestaurar) {
-          btnRestaurar.style.display = 'inline-block';
+          btnRestaurar.style.display = ''; // volta ao display definido no CSS dos botões
           btnRestaurar.addEventListener('click', restaurarMeusDados);
         }
-      } else if (aviso) {
-        aviso.textContent = 'Você está editando o catálogo-modelo (a base copiada para cada novo usuário).';
+      } else {
+        if (aviso) aviso.textContent = 'Você está editando o catálogo-modelo (a base copiada para cada novo usuário).';
+        const painelUsuarios = document.getElementById('painel_usuarios');
+        if (painelUsuarios) {
+          painelUsuarios.style.display = 'block';
+          document.getElementById('nav_usuarios')?.removeAttribute('hidden'); // link "Usuários" no menu
+          configurarPainelUsuarios();
+          carregarUsuarios();
+        }
       }
     }
   } else {
@@ -1105,7 +1114,7 @@ function renderizarEquipeComandada() {
   conteudo.innerHTML = `
     <div class="equipe_cabecalho">
       <div class="equipe_identidade">
-        <span class="equipe_badge" style="background:${cor1}; color:${cor2};">${esc(equipe.nome)}</span>
+        <span class="badge_equipe equipe_badge" style="background-color:${cor1}; color:${cor2};">${esc(equipe.nome)}</span>
         <span class="equipe_meta">${esc(equipe.pais)} • ${esc(equipe.nome_campeonato)} • ${criada ? 'Criada por você' : 'Equipe oficial'}</span>
       </div>
       <div class="equipe_acoes">${acoes}</div>
@@ -1118,18 +1127,20 @@ function renderizarEquipeComandada() {
       <div class="equipe_kpi"><span>Pilotos pagantes</span><strong>${resumo.pilotos_pagantes}</strong></div>
     </div>
 
-    <div class="equipe_contratar">
-      <input type="search" id="busca_contratar" list="lista_contratar" placeholder="${completo ? 'Elenco completo' : 'Digite o nome de um piloto para contratar...'}" autocomplete="off" ${completo ? 'disabled' : ''}>
-      <datalist id="lista_contratar">${sugestoes}</datalist>
-      <button type="button" id="btn_contratar" class="btn_acao" ${completo ? 'disabled' : ''}>Contratar</button>
-    </div>
-    ${completo ? `<p class="equipe_aviso">Elenco completo (${resumo.total_pilotos}/${equipe.elenco_maximo}). Dispense um piloto para contratar outro.</p>` : ''}
+    <div class="equipe_painel">
+      <div class="equipe_contratar">
+        <input type="search" id="busca_contratar" list="lista_contratar" placeholder="${completo ? 'Elenco completo' : 'Digite o nome de um piloto para contratar...'}" autocomplete="off" ${completo ? 'disabled' : ''}>
+        <datalist id="lista_contratar">${sugestoes}</datalist>
+        <button type="button" id="btn_contratar" class="btn_acao" ${completo ? 'disabled' : ''}>Contratar</button>
+      </div>
+      ${completo ? `<p class="equipe_aviso">Elenco completo (${resumo.total_pilotos}/${equipe.elenco_maximo}). Dispense um piloto para contratar outro.</p>` : ''}
 
-    <div class="equipe_tabela_wrap">
-      <table class="equipe_tabela">
-        <thead><tr><th>Piloto</th><th>País</th><th>Idade</th><th>Estrelas</th><th>Salário</th><th></th></tr></thead>
-        <tbody>${linhas}</tbody>
-      </table>
+      <div class="equipe_tabela_wrap">
+        <table class="comparacao_tabela equipe_tabela">
+          <thead><tr><th>Piloto</th><th>País</th><th>Idade</th><th>Estrelas</th><th>Salário</th><th></th></tr></thead>
+          <tbody>${linhas}</tbody>
+        </table>
+      </div>
     </div>`;
 
   document.getElementById('btn_deixar_equipe').addEventListener('click', deixarEquipe);
@@ -1218,7 +1229,7 @@ async function abrirModalEquipe(modo) {
 
   const seletor = document.getElementById('equipe_campeonato');
   seletor.innerHTML = '';
-  campeonatosData.forEach(c => seletor.add(new Option(`${c.nome} (${c.tipo} ${c.categoria}) — elenco de até ${c.elenco_maximo} pilotos`, c.id)));
+  campeonatosData.forEach(c => seletor.add(new Option(`${c.nome} — até ${c.elenco_maximo} pilotos`, c.id)));
 
   const editando = modo === 'editar' && minhaEquipe;
   document.getElementById('modal_equipe_titulo').textContent = editando ? 'Editar minha equipe' : 'Criar minha equipe';
@@ -1268,4 +1279,245 @@ async function salvarEquipe(evento) {
     botao.disabled = false;
     botao.textContent = textoOriginal;
   }
+}
+
+
+// ==========================================
+// --- 13. GESTÃO DE USUÁRIOS (ADMIN)       ---
+// ==========================================
+const USUARIOS_POR_PAGINA = 10;
+let usuariosPagina = 1;
+let usuariosBusca = '';
+let usuariosPerfil = '';
+let usuariosDaPagina = [];
+let usuarioDaSenha = null;
+let painelUsuariosConfigurado = false;
+let temporizadorBuscaUsuarios = null;
+
+// O id do usuário logado vem do próprio token. É só para a interface desabilitar botões:
+// quem realmente impede "excluir a si mesmo" e "alterar o próprio perfil" é a API.
+function idDoUsuarioLogado() {
+  try {
+    const payload = localStorage.getItem('jwt_token').split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+    return JSON.parse(atob(payload)).id;
+  } catch (_) {
+    return null;
+  }
+}
+
+const formatarData = (iso) => (iso ? new Date(iso).toLocaleDateString('pt-BR') : '—');
+
+async function carregarUsuarios() {
+  const alvo = document.getElementById('tabela_usuarios');
+  if (!alvo) return;
+
+  const params = new URLSearchParams({ pagina: usuariosPagina, limite: USUARIOS_POR_PAGINA });
+  if (usuariosBusca) params.set('busca', usuariosBusca);
+  if (usuariosPerfil) params.set('perfil', usuariosPerfil);
+
+  try {
+    const data = await chamarApi('GET', `/usuarios?${params}`);
+    // Excluiu o último da página: volta para a última página que ainda existe
+    if (data.dados.length === 0 && usuariosPagina > 1) {
+      usuariosPagina = data.paginacao.total_paginas;
+      return carregarUsuarios();
+    }
+    usuariosDaPagina = data.dados;
+    renderizarUsuarios(data.dados, data.paginacao);
+  } catch (err) {
+    alvo.textContent = `Não foi possível carregar os usuários: ${textoDoErro(err)}`;
+  }
+}
+
+function renderizarUsuarios(lista, paginacao) {
+  const alvo = document.getElementById('tabela_usuarios');
+  const meuId = idDoUsuarioLogado();
+
+  const linhas = lista.length
+    ? lista.map(u => {
+        const eu = u.id === meuId;
+        const outro = u.perfil === 'ADMIN' ? 'Manager' : 'Admin';
+        const classePerfil = u.perfil === 'ADMIN' ? 'user_perfil' : 'user_perfil perfil_manager';
+        const titulo = eu ? 'title="Você não pode fazer isso com a sua própria conta"' : '';
+        return `
+          <tr>
+            <td>${esc(u.nome)}${eu ? ' <small>(você)</small>' : ''}</td>
+            <td>${esc(u.email)}</td>
+            <td><span class="${classePerfil}">${esc(u.perfil)}</span></td>
+            <td>${Number(u.total_pilotos)}</td>
+            <td>${esc(u.equipe_criada || u.equipe_comandada || '—')}</td>
+            <td>${formatarData(u.criado_em)}</td>
+            <td>
+              <div class="acoes_linha">
+                <button type="button" class="btn_secundario btn_pequeno" data-acao="perfil" data-id="${Number(u.id)}" ${eu ? `disabled ${titulo}` : ''}>Tornar ${outro}</button>
+                <button type="button" class="btn_secundario btn_pequeno" data-acao="senha" data-id="${Number(u.id)}">Senha</button>
+                <button type="button" class="btn_dispensar" data-acao="excluir" data-id="${Number(u.id)}" ${eu ? `disabled ${titulo}` : ''}>Excluir</button>
+              </div>
+            </td>
+          </tr>`;
+      }).join('')
+    : '<tr><td colspan="7" class="equipe_elenco_vazio">Nenhum usuário encontrado.</td></tr>';
+
+  alvo.innerHTML = `
+    <table class="comparacao_tabela equipe_tabela tabela_usuarios">
+      <thead><tr><th>Nome</th><th>E-mail</th><th>Perfil</th><th>Pilotos</th><th>Equipe</th><th>Criado em</th><th></th></tr></thead>
+      <tbody>${linhas}</tbody>
+    </table>`;
+
+  renderizarPaginacaoUsuarios(paginacao);
+}
+
+function renderizarPaginacaoUsuarios({ pagina, total_paginas: totalPaginas, total }) {
+  const nav = document.getElementById('paginacao_usuarios');
+  if (!nav) return;
+
+  if (totalPaginas <= 1) {
+    nav.innerHTML = `<div class="paginacao_info_unica"><span>Exibindo <strong>${total}</strong> usuário(s)</span></div>`;
+    return;
+  }
+
+  nav.innerHTML = `
+    <div class="paginacao_wrapper">
+      <button type="button" class="paginacao_btn" id="usuarios_ant" ${pagina <= 1 ? 'disabled' : ''}>&laquo; Anterior</button>
+      <button type="button" class="paginacao_btn" id="usuarios_prox" ${pagina >= totalPaginas ? 'disabled' : ''}>Próxima &raquo;</button>
+    </div>
+    <div class="paginacao_subinfo">Página <strong>${pagina}</strong> de <strong>${totalPaginas}</strong> (${total} usuários no total)</div>`;
+
+  document.getElementById('usuarios_ant').addEventListener('click', () => { usuariosPagina = pagina - 1; carregarUsuarios(); });
+  document.getElementById('usuarios_prox').addEventListener('click', () => { usuariosPagina = pagina + 1; carregarUsuarios(); });
+}
+
+// Alterna o perfil. O aviso diz o que acontece com os dados pessoais do usuário.
+async function alterarPerfilUsuario(usuario) {
+  const novoPerfil = usuario.perfil === 'ADMIN' ? 'MANAGER' : 'ADMIN';
+  const aviso = novoPerfil === 'ADMIN'
+    ? `Tornar ${usuario.nome} ADMIN? Os dados pessoais dele serão apagados (${usuario.total_pilotos} piloto(s)${usuario.equipe_criada ? ` e a equipe "${usuario.equipe_criada}"` : ''}).`
+    : `Tornar ${usuario.nome} MANAGER? Ele receberá uma cópia nova do catálogo de pilotos.`;
+  if (!confirm(aviso)) return;
+
+  try {
+    await chamarApi('PUT', `/usuarios/${usuario.id}/perfil`, { perfil: novoPerfil });
+    await carregarUsuarios();
+    alert('Perfil atualizado com sucesso!');
+  } catch (err) {
+    alert('Não foi possível alterar o perfil: ' + textoDoErro(err));
+  }
+}
+
+// A confirmação mostra quantos pilotos e qual equipe saem junto com o usuário
+async function excluirUsuario(usuario) {
+  const junto = usuario.total_pilotos > 0 || usuario.equipe_criada
+    ? ` Serão apagados junto: ${usuario.total_pilotos} piloto(s)${usuario.equipe_criada ? ` e a equipe "${usuario.equipe_criada}"` : ''}.`
+    : '';
+  if (!confirm(`Excluir ${usuario.nome} (${usuario.email})?${junto} Esta ação não pode ser desfeita.`)) return;
+
+  try {
+    await chamarApi('DELETE', `/usuarios/${usuario.id}`);
+    await carregarUsuarios();
+    alert('Usuário excluído com sucesso!');
+  } catch (err) {
+    alert('Não foi possível excluir: ' + textoDoErro(err));
+  }
+}
+
+function abrirModalNovoUsuario() {
+  document.getElementById('form_usuario').reset();
+  mostrarErroModal([], 'usuario_erros');
+  document.getElementById('modal_usuario').showModal();
+}
+
+function abrirModalSenha(usuario) {
+  usuarioDaSenha = usuario;
+  document.getElementById('form_senha').reset();
+  document.getElementById('senha_usuario_nome').textContent = usuario.nome; // textContent: nunca interpretado como HTML
+  mostrarErroModal([], 'senha_erros');
+  document.getElementById('modal_senha').showModal();
+}
+
+async function salvarNovoUsuario(evento) {
+  evento.preventDefault();
+  const botao = document.getElementById('btn_salvar_usuario');
+  const textoOriginal = botao.textContent;
+  botao.disabled = true;
+  botao.textContent = 'Criando...';
+  mostrarErroModal([], 'usuario_erros');
+
+  try {
+    await chamarApi('POST', '/usuarios', {
+      nome: document.getElementById('usuario_nome').value.trim(),
+      email: document.getElementById('usuario_email').value.trim(),
+      senha: document.getElementById('usuario_senha').value,
+      perfil: document.getElementById('usuario_perfil').value
+    });
+    document.getElementById('modal_usuario').close();
+    usuariosPagina = 1;
+    await carregarUsuarios();
+    alert('Usuário criado com sucesso!');
+  } catch (err) {
+    mostrarErroModal(err.lista && err.lista.length ? err.lista : [err.message], 'usuario_erros');
+  } finally {
+    botao.disabled = false;
+    botao.textContent = textoOriginal;
+  }
+}
+
+async function salvarNovaSenha(evento) {
+  evento.preventDefault();
+  if (!usuarioDaSenha) return;
+  const botao = document.getElementById('btn_salvar_senha');
+  const textoOriginal = botao.textContent;
+  botao.disabled = true;
+  botao.textContent = 'Salvando...';
+  mostrarErroModal([], 'senha_erros');
+
+  try {
+    await chamarApi('PUT', `/usuarios/${usuarioDaSenha.id}/senha`, { senha: document.getElementById('senha_nova').value });
+    document.getElementById('modal_senha').close();
+    document.getElementById('form_senha').reset(); // não deixa a senha digitada na tela/formulário
+    alert('Senha redefinida com sucesso!');
+  } catch (err) {
+    mostrarErroModal(err.lista && err.lista.length ? err.lista : [err.message], 'senha_erros');
+  } finally {
+    botao.disabled = false;
+    botao.textContent = textoOriginal;
+  }
+}
+
+function configurarPainelUsuarios() {
+  if (painelUsuariosConfigurado) return; // evita listeners duplicados
+  painelUsuariosConfigurado = true;
+
+  // Busca com pequena espera para não consultar a cada tecla
+  document.getElementById('busca_usuario').addEventListener('input', (e) => {
+    clearTimeout(temporizadorBuscaUsuarios);
+    temporizadorBuscaUsuarios = setTimeout(() => {
+      usuariosBusca = e.target.value.trim();
+      usuariosPagina = 1;
+      carregarUsuarios();
+    }, 300);
+  });
+  document.getElementById('filtro_perfil').addEventListener('change', (e) => {
+    usuariosPerfil = e.target.value;
+    usuariosPagina = 1;
+    carregarUsuarios();
+  });
+  document.getElementById('btn_novo_usuario').addEventListener('click', abrirModalNovoUsuario);
+
+  // Um único ouvinte para os botões de todas as linhas da tabela
+  document.getElementById('tabela_usuarios').addEventListener('click', (e) => {
+    const botao = e.target.closest('button[data-acao]');
+    if (!botao || botao.disabled) return;
+    const usuario = usuariosDaPagina.find(u => u.id === Number(botao.dataset.id));
+    if (!usuario) return;
+    if (botao.dataset.acao === 'perfil') alterarPerfilUsuario(usuario);
+    else if (botao.dataset.acao === 'senha') abrirModalSenha(usuario);
+    else if (botao.dataset.acao === 'excluir') excluirUsuario(usuario);
+  });
+
+  document.getElementById('form_usuario').addEventListener('submit', salvarNovoUsuario);
+  document.getElementById('form_senha').addEventListener('submit', salvarNovaSenha);
+  document.getElementById('btn_fechar_modal_usuario').addEventListener('click', () => document.getElementById('modal_usuario').close());
+  document.getElementById('btn_cancelar_modal_usuario').addEventListener('click', () => document.getElementById('modal_usuario').close());
+  document.getElementById('btn_fechar_modal_senha').addEventListener('click', () => document.getElementById('modal_senha').close());
+  document.getElementById('btn_cancelar_modal_senha').addEventListener('click', () => document.getElementById('modal_senha').close());
 }

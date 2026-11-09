@@ -15,6 +15,8 @@
             <nav class="main_nav" aria-label="Navegação Pricipal">
                 <ul>
                     <li><a href="#comparador" class="nav_links">Comparador</a></li>
+                    <li id="nav_usuarios" hidden><a href="#painel_usuarios" class="nav_links">Usuários</a></li>
+                    <li id="nav_minha_equipe" hidden><a href="#painel_minha_equipe" class="nav_links">Minha Equipe</a></li>
                     <li><a href="#grid_catalogo" class="nav_links">Catálogo</a></li>
                     <li><a href="#guia_ajuda" class="nav_links">Ajuda/Guia</a></li>
                 </ul>
@@ -51,18 +53,47 @@
             </div>
         </section>
 
-        <div id="painel_admin" style="display: none; justify-content: space-between; align-items: center; gap: 1rem; flex-wrap: wrap; margin-bottom: 1rem;">
-            <p id="aviso_escopo" style="margin: 0; font-size: 0.9rem; color: var(--text-muted);"></p>
-            <div style="display: flex; gap: 0.75rem; flex-wrap: wrap;">
-                <button id="btn_restaurar_dados" class="btn_secundario" style="display: none;" title="Descarta as suas edições e recebe uma cópia nova do catálogo-modelo">Restaurar meus dados</button>
-                <button id="btn_novo_piloto" class="btn_acao" style="background-color: var(--accent-green); border-color: var(--accent-green);">+ Cadastrar Novo Piloto</button>
+        <section id="painel_usuarios" style="display: none;" aria-labelledby="titulo_usuarios">
+            <h2 id="titulo_usuarios">Usuários</h2>
+            <p>Gerencie as contas do sistema: crie usuários, altere perfis, redefina senhas e exclua contas.</p>
+
+            <div class="catalogo_toolbar usuarios_toolbar" role="search" aria-label="Filtro e busca de usuários">
+                <div class="filtro_item">
+                    <label for="busca_usuario">Buscar usuário:</label>
+                    <input type="search" id="busca_usuario" placeholder="Nome ou e-mail..." autocomplete="off">
+                </div>
+                <div class="filtro_item">
+                    <label for="filtro_perfil">Perfil:</label>
+                    <select id="filtro_perfil">
+                        <option value="">Todos</option>
+                        <option value="ADMIN">Admin</option>
+                        <option value="MANAGER">Manager</option>
+                    </select>
+                </div>
+                <div class="filtro_item filtro_acao">
+                    <button type="button" id="btn_novo_usuario" class="btn_acao btn_sucesso">+ Novo usuário</button>
+                </div>
             </div>
-        </div>
+
+            <div class="equipe_painel">
+                <div class="equipe_tabela_wrap" id="tabela_usuarios"></div>
+            </div>
+            <nav id="paginacao_usuarios" class="paginacao_nav" aria-label="Paginação dos usuários"></nav>
+        </section>
 
         <section id="painel_minha_equipe" class="minha_equipe" style="display: none;" aria-labelledby="titulo_minha_equipe">
             <h2 id="titulo_minha_equipe">Minha Equipe</h2>
+            <p>Comande uma equipe do jogo ou crie a sua: acompanhe o elenco, a folha salarial e a média de estrelas.</p>
             <div id="conteudo_minha_equipe"></div>
         </section>
+
+        <div id="painel_admin" class="barra_acoes" style="display: none;">
+            <p id="aviso_escopo" class="barra_acoes_texto"></p>
+            <div class="barra_acoes_botoes">
+                <button type="button" id="btn_restaurar_dados" class="btn_secundario" style="display: none;" title="Descarta as suas edições e recebe uma cópia nova do catálogo-modelo">Restaurar meus dados</button>
+                <button type="button" id="btn_novo_piloto" class="btn_acao btn_sucesso">+ Cadastrar Novo Piloto</button>
+            </div>
+        </div>
 
         <section id="grid_catalogo" aria-labelledby="titulo_catalogo">
             <div class="catalogo_header">
@@ -288,7 +319,7 @@
       <div class="form_grid">
         <div class="form_group">
           <label for="crud_nome">Nome Completo *</label>
-          <input type="text" id="crud_nome" required minlength="2" maxlength="100" placeholder="Ex: Lucas Mendes">
+          <input type="text" id="crud_nome" autofocus required minlength="2" maxlength="100" placeholder="Ex: Lucas Mendes">
         </div>
 
         <div class="form_group">
@@ -367,7 +398,7 @@
       <div class="form_grid">
         <div class="form_group">
           <label for="equipe_nome">Nome da equipe *</label>
-          <input type="text" id="equipe_nome" required minlength="2" maxlength="80" placeholder="Ex: Escuderia Sorocaba">
+          <input type="text" id="equipe_nome" autofocus required minlength="2" maxlength="80" placeholder="Ex: Escuderia Sorocaba">
         </div>
 
         <div class="form_group">
@@ -375,7 +406,7 @@
           <input type="text" id="equipe_pais" required minlength="2" maxlength="60" placeholder="Ex: Brasil">
         </div>
 
-        <div class="form_group">
+        <div class="form_group form_group_largo">
           <label for="equipe_campeonato">Campeonato *</label>
           <select id="equipe_campeonato" required></select>
         </div>
@@ -394,6 +425,77 @@
       <div class="modal_actions">
         <button type="button" id="btn_cancelar_modal_equipe" class="btn_secundario">Cancelar</button>
         <button type="submit" id="btn_salvar_equipe" class="btn_acao">Salvar equipe</button>
+      </div>
+    </form>
+  </dialog>
+
+  
+  <!-- MODAL: criar usuário (ADMIN) -->
+  <dialog id="modal_usuario" class="modal_crud">
+    <div class="modal_header">
+      <h2>Novo usuário</h2>
+      <button type="button" id="btn_fechar_modal_usuario" aria-label="Fechar modal">&times;</button>
+    </div>
+
+    <form id="form_usuario">
+      <div id="usuario_erros" class="msg_erro_modal" role="alert" hidden></div>
+
+      <div class="form_grid">
+        <div class="form_group">
+          <label for="usuario_nome">Nome de usuário *</label>
+          <input type="text" id="usuario_nome" autofocus required minlength="3" maxlength="60" placeholder="Ex: carlos.silva" autocomplete="off">
+        </div>
+
+        <div class="form_group">
+          <label for="usuario_email">E-mail *</label>
+          <input type="email" id="usuario_email" required maxlength="120" placeholder="Ex: carlos@exemplo.com" autocomplete="off">
+        </div>
+
+        <div class="form_group">
+          <label for="usuario_senha">Senha *</label>
+          <input type="password" id="usuario_senha" required minlength="8" maxlength="72" autocomplete="new-password">
+        </div>
+
+        <div class="form_group">
+          <label for="usuario_perfil">Perfil *</label>
+          <select id="usuario_perfil">
+            <option value="MANAGER">Manager</option>
+            <option value="ADMIN">Admin</option>
+          </select>
+        </div>
+      </div>
+
+      <small class="form_dica">A senha deve ter de 8 a 72 caracteres, com pelo menos uma letra e um número. Um Manager já recebe a sua cópia do catálogo de pilotos.</small>
+
+      <div class="modal_actions">
+        <button type="button" id="btn_cancelar_modal_usuario" class="btn_secundario">Cancelar</button>
+        <button type="submit" id="btn_salvar_usuario" class="btn_acao">Criar usuário</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- MODAL: redefinir a senha de um usuário (ADMIN) -->
+  <dialog id="modal_senha" class="modal_crud">
+    <div class="modal_header">
+      <h2>Redefinir senha</h2>
+      <button type="button" id="btn_fechar_modal_senha" aria-label="Fechar modal">&times;</button>
+    </div>
+
+    <form id="form_senha">
+      <div id="senha_erros" class="msg_erro_modal" role="alert" hidden></div>
+
+      <p class="modal_subtitulo">Nova senha para <strong id="senha_usuario_nome"></strong></p>
+
+      <div class="form_group">
+        <label for="senha_nova">Nova senha *</label>
+        <input type="password" id="senha_nova" autofocus required minlength="8" maxlength="72" autocomplete="new-password">
+      </div>
+
+      <small class="form_dica">De 8 a 72 caracteres, com pelo menos uma letra e um número. As sessões já abertas do usuário continuam válidas até expirarem.</small>
+
+      <div class="modal_actions">
+        <button type="button" id="btn_cancelar_modal_senha" class="btn_secundario">Cancelar</button>
+        <button type="submit" id="btn_salvar_senha" class="btn_acao">Redefinir senha</button>
       </div>
     </form>
   </dialog>

@@ -160,6 +160,15 @@ function resolverEstrelas(dados, existente) {
 // ---------------------------------------------------------------------
 const REGEX_EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+// Regra de senha (cadastro público e gestão de usuários): devolve a mensagem de erro, ou null se for válida.
+// 8 a 72 bytes (limite do bcrypt), com ao menos uma letra e um número.
+function erroDeSenha(senha) {
+  if (typeof senha !== 'string') return 'Senha é obrigatória e deve ser um texto.';
+  if (senha.length < 8 || Buffer.byteLength(senha, 'utf8') > 72) return 'A senha deve ter entre 8 e 72 caracteres.';
+  if (!/[A-Za-z]/.test(senha) || !/\d/.test(senha)) return 'A senha deve conter pelo menos uma letra e um número.';
+  return null;
+}
+
 function validarRegistro(entrada) {
   if (!ehObjeto(entrada)) {
     return { valido: false, dados: null, erros: [{ campo: 'body', mensagem: 'Corpo da requisição inválido.' }] };
@@ -187,14 +196,10 @@ function validarRegistro(entrada) {
     else dados.email = email;
   }
 
-  // Senha: 8 a 72 bytes (limite do bcrypt), com ao menos uma letra e um número
-  if (typeof entrada.senha !== 'string') {
-    erro('senha', 'Senha é obrigatória e deve ser um texto.');
-  } else if (entrada.senha.length < 8 || Buffer.byteLength(entrada.senha, 'utf8') > 72) {
-    erro('senha', 'A senha deve ter entre 8 e 72 caracteres.');
-  } else if (!/[A-Za-z]/.test(entrada.senha) || !/\d/.test(entrada.senha)) {
-    erro('senha', 'A senha deve conter pelo menos uma letra e um número.');
-  } else dados.senha = entrada.senha;
+  // Senha
+  const problemaSenha = erroDeSenha(entrada.senha);
+  if (problemaSenha) erro('senha', problemaSenha);
+  else dados.senha = entrada.senha;
 
   return { valido: erros.length === 0, dados: erros.length === 0 ? dados : null, erros };
 }
@@ -266,8 +271,69 @@ function mesclarEquipe(existente, corpo) {
   return mesclado;
 }
 
+// ---------------------------------------------------------------------
+// Gestão de usuários (ADMIN)
+// ---------------------------------------------------------------------
+const PERFIS = ['ADMIN', 'MANAGER'];
+const LIMITE_MAXIMO_LISTAGEM = 50;
+
+// Criação de conta pelo ADMIN: mesmas regras do cadastro público + escolha do perfil
+function validarNovoUsuario(entrada) {
+  const resultado = validarRegistro(entrada);
+  const erros = [...resultado.erros];
+  const perfil = ehObjeto(entrada) ? entrada.perfil : undefined;
+
+  if (!PERFIS.includes(perfil)) erros.push({ campo: 'perfil', mensagem: `Perfil deve ser um de: ${PERFIS.join(', ')}.` });
+
+  if (erros.length > 0) return { valido: false, dados: null, erros };
+  return { valido: true, dados: { ...resultado.dados, perfil }, erros: [] };
+}
+
+function validarPerfil(entrada) {
+  const perfil = ehObjeto(entrada) ? entrada.perfil : undefined;
+  if (!PERFIS.includes(perfil)) {
+    return { valido: false, dados: null, erros: [{ campo: 'perfil', mensagem: `Perfil deve ser um de: ${PERFIS.join(', ')}.` }] };
+  }
+  return { valido: true, dados: { perfil }, erros: [] };
+}
+
+function validarNovaSenha(entrada) {
+  const problema = erroDeSenha(ehObjeto(entrada) ? entrada.senha : undefined);
+  if (problema) return { valido: false, dados: null, erros: [{ campo: 'senha', mensagem: problema }] };
+  return { valido: true, dados: { senha: entrada.senha }, erros: [] };
+}
+
+// Parâmetros de GET /api/usuarios: pagina, limite, busca e perfil (todos opcionais)
+function validarListagemUsuarios(query) {
+  const erros = [];
+  const dados = { pagina: 1, limite: 10, busca: null, perfil: null };
+  const erro = (campo, mensagem) => erros.push({ campo, mensagem });
+  const q = ehObjeto(query) ? query : {};
+
+  if (q.pagina !== undefined) {
+    if (typeof q.pagina !== 'string' || !/^[1-9]\d{0,6}$/.test(q.pagina)) erro('pagina', 'Página deve ser um inteiro positivo.');
+    else dados.pagina = Number(q.pagina);
+  }
+  if (q.limite !== undefined) {
+    const n = typeof q.limite === 'string' && /^\d{1,3}$/.test(q.limite) ? Number(q.limite) : NaN;
+    if (!(n >= 1 && n <= LIMITE_MAXIMO_LISTAGEM)) erro('limite', `Limite deve ser um inteiro entre 1 e ${LIMITE_MAXIMO_LISTAGEM}.`);
+    else dados.limite = n;
+  }
+  if (q.busca !== undefined) {
+    if (typeof q.busca !== 'string' || q.busca.trim().length > 60) erro('busca', 'Busca deve ser um texto de até 60 caracteres.');
+    else if (q.busca.trim() !== '') dados.busca = q.busca.trim();
+  }
+  if (q.perfil !== undefined && q.perfil !== '') {
+    if (!PERFIS.includes(q.perfil)) erro('perfil', `Perfil deve ser um de: ${PERFIS.join(', ')}.`);
+    else dados.perfil = q.perfil;
+  }
+
+  return { valido: erros.length === 0, dados: erros.length === 0 ? dados : null, erros };
+}
+
 module.exports = {
   ATRIBUTOS, SERIES, STATUS_CONTRATO,
   validarId, validarPiloto, mesclarPiloto, resolverEstrelas, calcularEstrelasAtuais, limparTexto,
-  validarRegistro, validarLogin, validarEquipe, mesclarEquipe
+  validarRegistro, validarLogin, validarEquipe, mesclarEquipe,
+  PERFIS, validarNovoUsuario, validarPerfil, validarNovaSenha, validarListagemUsuarios
 };

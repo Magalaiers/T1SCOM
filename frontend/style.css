@@ -1123,34 +1123,155 @@ main {
 
 
 /* =========================================
-   MINHA EQUIPE (painel do MANAGER)
+   LAYOUT: conteúdo alinhado ao cabeçalho
+   (o cabeçalho já é centralizado em até 1200px; o conteúdo ocupava a tela toda)
+   Para voltar ao layout antigo, apague esta regra.
    ========================================= */
-.minha_equipe {
+main.container {
+  width: 92%;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+/* =========================================
+   BOTÕES: um padrão só para o site inteiro
+   .btn_acao      = ação principal (vermelho)
+   .btn_sucesso   = ação de cadastro (verde, usada junto com .btn_acao)
+   .btn_secundario= ação neutra (contorno)
+   .btn_perigo    = ação destrutiva (contorno vermelho, junto com .btn_secundario)
+   .btn_dispensar = versão compacta para tabelas
+   ========================================= */
+.btn_acao,
+.btn_secundario,
+.btn_dispensar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  min-height: 2.6rem;
+  padding: 0.55rem 1.15rem;
+  font-family: inherit;
+  font-size: 0.9rem;
+  font-weight: 600;
+  line-height: 1.2;
+  white-space: nowrap;
+  text-decoration: none;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition: background-color 0.2s, border-color 0.2s, color 0.2s, opacity 0.2s;
+}
+
+.btn_acao {
+  background-color: var(--accent);
+  border-color: var(--accent);
+  color: #ffffff;
+}
+
+.btn_acao:hover:not(:disabled) {
+  background-color: var(--accent-hover);
+  border-color: var(--accent-hover);
+}
+
+.btn_acao.btn_sucesso {
+  background-color: var(--accent-green-bg);
+  border-color: var(--accent-green);
+}
+
+.btn_acao.btn_sucesso:hover:not(:disabled) {
+  background-color: var(--accent-green);
+  border-color: var(--accent-green);
+}
+
+.btn_secundario {
+  background-color: transparent;
+  border-color: var(--border);
+  color: var(--text-main);
+}
+
+.btn_secundario:hover:not(:disabled) {
   background-color: var(--bg-card);
+  border-color: var(--accent);
+}
+
+.btn_secundario.btn_perigo {
+  border-color: var(--accent);
+  color: #ff6b6b;
+}
+
+.btn_secundario.btn_perigo:hover:not(:disabled) {
+  background-color: rgba(225, 6, 0, 0.12);
+}
+
+.btn_dispensar {
+  min-height: 2rem;
+  padding: 0.25rem 0.8rem;
+  font-size: 0.8rem;
+  background-color: transparent;
+  border-color: var(--border);
+  color: #ff6b6b;
+}
+
+.btn_dispensar:hover:not(:disabled) {
+  background-color: rgba(225, 6, 0, 0.12);
+  border-color: var(--accent);
+}
+
+.btn_acao:disabled,
+.btn_secundario:disabled,
+.btn_dispensar:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* Botão "×" de fechar dos dois modais */
+#btn_fechar_modal,
+#btn_fechar_modal_equipe {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  font-size: 1.5rem;
+  line-height: 1;
+  cursor: pointer;
+  transition: color 0.2s;
+}
+
+#btn_fechar_modal_equipe:hover {
+  color: var(--accent);
+}
+
+/* =========================================
+   BARRA DE AÇÕES (Restaurar meus dados / Cadastrar piloto)
+   Mesmo visual das seções, com respiro nas bordas
+   ========================================= */
+.barra_acoes {
+  /* o display (none -> flex) é controlado pelo JavaScript conforme o perfil */
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+  background-color: var(--bg-surface);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  padding: 1.5rem;
-  margin-bottom: 2rem;
+  padding: 1rem 1.75rem;
 }
 
-.minha_equipe > h2 {
-  margin: 0 0 1rem;
+.barra_acoes_texto {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--text-muted);
 }
 
-.equipe_vazia {
+.barra_acoes_botoes {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
+  gap: 0.75rem;
   flex-wrap: wrap;
 }
 
-.equipe_vazia p {
-  margin: 0;
-  color: var(--text-muted);
-  max-width: 60ch;
-}
-
+/* =========================================
+   MINHA EQUIPE (usa o visual padrão das seções)
+   ========================================= */
 .equipe_cabecalho {
   display: flex;
   align-items: center;
@@ -1167,11 +1288,10 @@ main {
   flex-wrap: wrap;
 }
 
-.equipe_badge {
-  padding: 0.45rem 1rem;
-  border-radius: var(--radius);
-  font-weight: 700;
-  font-size: 1.05rem;
+.badge_equipe.equipe_badge {
+  margin-top: 0;
+  padding: 0.4rem 0.9rem;
+  font-size: 0.95rem;
 }
 
 .equipe_meta {
@@ -1181,143 +1301,60 @@ main {
 
 .equipe_acoes {
   display: flex;
-  gap: 0.6rem;
+  align-items: center;
+  gap: 0.75rem;
   flex-wrap: wrap;
-}
-
-.btn_perigo {
-  border-color: var(--accent);
-  color: #ff6b6b;
 }
 
 .equipe_kpis {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
-  gap: 0.9rem;
-  margin-bottom: 1.25rem;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1.5rem;
 }
 
 .equipe_kpi {
-  background-color: var(--bg-surface);
+  background-color: var(--bg-card);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  padding: 0.9rem 1rem;
+  padding: 1rem 1.25rem;
 }
 
 .equipe_kpi span {
   display: block;
-  font-size: 0.75rem;
+  font-size: 0.78rem;
+  font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.5px;
   color: var(--text-muted);
-  margin-bottom: 0.3rem;
+  margin-bottom: 0.35rem;
 }
 
 .equipe_kpi strong {
   font-size: 1.3rem;
 }
 
+.equipe_kpi small {
+  color: var(--text-muted);
+}
+
+/* Caixa do elenco: mesmo padrão dos quadros internos do comparador e do catálogo */
+.equipe_painel {
+  background-color: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.5rem;
+}
+
 .equipe_contratar {
   display: flex;
-  gap: 0.6rem;
+  gap: 0.75rem;
   flex-wrap: wrap;
   margin-bottom: 1rem;
 }
 
 .equipe_contratar input {
   flex: 1 1 260px;
-  min-width: 0;
-  background-color: var(--bg-surface);
-  color: var(--text-main);
-  border: 1px solid var(--border);
-  padding: 0.7rem 1rem;
-  border-radius: var(--radius);
-  font-family: inherit;
-}
-
-.equipe_tabela_wrap {
-  overflow-x: auto;
-}
-
-.equipe_tabela {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 0.92rem;
-}
-
-.equipe_tabela th,
-.equipe_tabela td {
-  text-align: left;
-  padding: 0.6rem 0.75rem;
-  border-bottom: 1px solid var(--border);
-  white-space: nowrap;
-}
-
-.equipe_tabela th {
-  font-size: 0.75rem;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  color: var(--text-muted);
-}
-
-.equipe_elenco_vazio {
-  color: var(--text-muted);
-  text-align: center !important;
-  white-space: normal !important;
-}
-
-.btn_dispensar {
-  background: transparent;
-  color: #ff6b6b;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 0.3rem 0.7rem;
-  cursor: pointer;
-}
-
-.btn_dispensar:hover {
-  border-color: var(--accent);
-}
-
-.modal_crud input[type="color"] {
-  width: 100%;
-  height: 2.6rem;
-  padding: 0.2rem;
-  background-color: var(--bg-surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  cursor: pointer;
-}
-
-/* Minha Equipe: tela de escolha (assumir uma equipe oficial ou criar a própria) */
-.equipe_escolha {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-  gap: 1rem;
-}
-
-.equipe_opcao {
-  background-color: var(--bg-surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 1.25rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-}
-
-.equipe_opcao h3 {
-  margin: 0;
-}
-
-.equipe_opcao p {
-  margin: 0;
-  color: var(--text-muted);
-  font-size: 0.92rem;
-}
-
-.equipe_opcao select {
-  width: 100%;
 }
 
 .equipe_aviso {
@@ -1326,8 +1363,195 @@ main {
   font-size: 0.9rem;
 }
 
-.equipe_contratar input:disabled,
-.equipe_contratar button:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
+.equipe_tabela_wrap {
+  overflow-x: auto;
+}
+
+.equipe_tabela th:first-child,
+.equipe_tabela td:first-child {
+  text-align: left;
+}
+
+.equipe_tabela td {
+  white-space: nowrap;
+}
+
+.equipe_elenco_vazio {
+  color: var(--text-muted);
+  font-style: italic;
+  padding: 1.5rem 1rem !important;
+}
+
+/* Tela de escolha: assumir uma equipe do jogo ou criar a própria */
+.equipe_escolha {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1rem;
+}
+
+.equipe_opcao {
+  background-color: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+}
+
+.equipe_opcao h3 {
+  margin: 0;
+}
+
+.equipe_opcao p {
+  margin: 0;
+  flex: 1 1 auto;
+}
+
+.equipe_opcao .btn_acao {
+  align-self: stretch;
+}
+
+/* Modais: barra de rolagem e setinhas dos campos numéricos no tema escuro */
+.modal_crud {
+  color-scheme: dark;
+}
+
+/* Modal da equipe: espaçamento igual ao modal de piloto */
+#form_equipe {
+  padding: 1.5rem;
+}
+
+.form_group_largo {
+  grid-column: 1 / -1;
+}
+
+.modal_crud input[type="color"] {
+  width: 100%;
+  height: 2.75rem;
+  padding: 0.2rem;
+  background-color: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+
+/* =========================================
+   CABEÇALHO EM TELAS ESTREITAS
+   Os links não quebram em duas linhas e o menu desce para uma linha própria
+   ========================================= */
+.nav_links {
+  white-space: nowrap;
+}
+
+@media (max-width: 760px) {
+  header > div,
+  .header_content {
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0.6rem 1.25rem;
+  }
+
+  .main_nav {
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0.6rem 1.25rem;
+  }
+
+  .main_nav ul {
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0.4rem 0.75rem;
+  }
+
+  .auth_box {
+    border-left: none;
+    padding-left: 0;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+}
+
+
+/* =========================================
+   GESTÃO DE USUÁRIOS (ADMIN)
+   ========================================= */
+.usuarios_toolbar {
+  margin-bottom: 1.25rem;
+}
+
+.filtro_acao {
+  flex: 0 0 auto;
+  justify-content: flex-end;
+}
+
+.perfil_manager {
+  color: var(--accent-blue);
+  border-color: var(--accent-blue);
+}
+
+.btn_secundario.btn_pequeno {
+  min-height: 2rem;
+  padding: 0.25rem 0.8rem;
+  font-size: 0.8rem;
+}
+
+.acoes_linha {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+
+.tabela_usuarios td:nth-child(2) {
+  text-align: left;
+}
+
+.modal_crud input[type="email"],
+.modal_crud input[type="password"] {
+  width: 100%;
+  min-width: 0;
+  background-color: var(--bg-surface);
+  color: var(--text-main);
+  border: 1px solid var(--border);
+  padding: 0.75rem 1rem;
+  border-radius: var(--radius);
+  font-size: 0.95rem;
+  font-family: inherit;
+}
+
+.modal_crud input[type="email"]:focus,
+.modal_crud input[type="password"]:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+#form_usuario,
+#form_senha {
+  padding: 1.5rem;
+}
+
+#form_usuario .form_dica,
+#form_senha .form_dica {
+  margin: -0.5rem 0 1.25rem;
+}
+
+.modal_subtitulo {
+  margin-bottom: 1rem;
+  color: var(--text-muted);
+}
+
+#btn_fechar_modal_usuario,
+#btn_fechar_modal_senha {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  font-size: 1.5rem;
+  line-height: 1;
+  cursor: pointer;
+  transition: color 0.2s;
+}
+
+#btn_fechar_modal_usuario:hover,
+#btn_fechar_modal_senha:hover {
+  color: var(--accent);
 }
