@@ -1,11 +1,13 @@
 const crypto = require('crypto');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const db = require('../config/db');
 const { JWT_SECRET, JWT_EXPIRES_IN } = require('../config/jwt');
 const logger = require('../utils/logger');
 const { erro, erroValidacao, erroInterno, sucesso } = require('../utils/respostas');
 const { validarLogin, validarRegistro } = require('../utils/validators');
+const usuarioRepo = require('../repositories/usuarioRepository');
+const pilotoRepo = require('../repositories/pilotoRepository');
+const { comTransacao } = require('../repositories/transacao');
 
 // Hash descartável: quando o usuário não existe, ainda executamos um bcrypt.compare
 // para que o tempo de resposta não revele se o e-mail/nome está cadastrado.
@@ -20,13 +22,9 @@ exports.login = async (req, res) => {
 
   try {
     // "@" => busca por e-mail; senão por nome de usuário (o cadastro proíbe "@" no nome)
-    const porEmail = identificador.includes('@');
-    const [usuarios] = await db.execute(
-      `SELECT id, nome, email, senha_hash, perfil FROM usuarios WHERE ${porEmail ? 'email' : 'nome'} = ? LIMIT 1`,
-      [porEmail ? identificador.toLowerCase() : identificador]
-    );
-
-    const usuario = usuarios[0];
+    const usuario = identificador.includes('@')
+      ? await usuarioRepo.buscarPorEmail(identificador.toLowerCase())
+      : await usuarioRepo.buscarPorNome(identificador);
     const senhaCorreta = await bcrypt.compare(senha, usuario ? usuario.senha_hash : HASH_FALSO);
 
     if (!usuario || !senhaCorreta) {
@@ -65,10 +63,7 @@ exports.registrar = async (req, res) => {
   if (!valido) return erroValidacao(res, erros, erros[0].mensagem);
 
   try {
-    const [existentes] = await db.execute(
-      'SELECT email, nome FROM usuarios WHERE email = ? OR nome = ?',
-      [dados.email, dados.nome]
-    );
+    const existentes = await usuarioRepo.buscarPorEmailOuNome(dados.email, dados.nome);
 
     if (existentes.length > 0) {
       const nomeEmUso = existentes.some((u) => u.nome.toLowerCase() === dados.nome.toLowerCase());
@@ -78,12 +73,15 @@ exports.registrar = async (req, res) => {
     }
 
     const senhaHash = await bcrypt.hash(dados.senha, 10);
-    const [resultado] = await db.execute(
-      "INSERT INTO usuarios (nome, email, senha_hash, perfil) VALUES (?, ?, ?, 'MANAGER')",
-      [dados.nome, dados.email, senhaHash]
-    );
 
-    logger.info('AUTH', `Novo usuário cadastrado: ${dados.email} (ID ${resultado.insertId})`);
+    // Cria a conta e já entrega a cópia pessoal do catálogo; se a cópia falhar, a conta também não é criada
+    const novoId = await comTransacao(async (conexao) => {
+      const id = await usuarioRepo.inserir({ nome: dados.nome, email: dados.email, senhaHash, perfil: 'MANAGER' }, conexao);
+      await pilotoRepo.copiarCatalogoPara(id, conexao);
+      return id;
+    });
+
+    logger.info('AUTH', `Novo usuário cadastrado: ${dados.email} (ID ${novoId}) com cópia do catálogo`);
     return sucesso(res, 201, { mensagem: 'Conta criada com sucesso! Você já pode fazer login.' });
   } catch (excecao) {
     if (excecao.code === 'ER_DUP_ENTRY') {

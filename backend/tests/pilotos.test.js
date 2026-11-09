@@ -1,14 +1,12 @@
 // Testes automatizados: lógica de negócio (unitários) + API (integração).
 // Pré-requisitos: banco criado (database/schema.sql) e populado (npm run seed).
 const request = require('supertest');
-const jwt = require('jsonwebtoken');
 const app = require('../server');
 const db = require('../src/config/db');
 const {
   ATRIBUTOS, validarPiloto, mesclarPiloto, resolverEstrelas, calcularEstrelasAtuais, validarId
 } = require('../src/utils/validators');
-
-const JWT_SECRET = process.env.JWT_SECRET; // definido no .env (o servidor nem inicia sem ele)
+const { criarManager, criarAdmin, removerUsuarios } = require('./helpers');
 
 const atributosValidos = (valor = 15) => Object.fromEntries(ATRIBUTOS.map((c) => [c, valor]));
 const pilotoValido = (extra = {}) => ({
@@ -86,9 +84,8 @@ describe('Validação e regras de negócio', () => {
 // ---------------------------------------------------------------------
 describe('API de pilotos', () => {
   const criados = [];
+  let admin;
   let tokenAdmin;
-  let tokenManager;
-  let tokenSemPermissao;
   let equipeId;
 
   const auth = (token) => ({ Authorization: `Bearer ${token}` });
@@ -99,15 +96,16 @@ describe('API de pilotos', () => {
   };
 
   beforeAll(async () => {
-    tokenAdmin = jwt.sign({ id: 1, nome: 'Admin Teste', email: 'admin@teste.com', perfil: 'ADMIN' }, JWT_SECRET, { expiresIn: '1h' });
-    tokenManager = jwt.sign({ id: 2, nome: 'Manager Teste', email: 'manager@teste.com', perfil: 'MANAGER' }, JWT_SECRET, { expiresIn: '1h' });
-    tokenSemPermissao = jwt.sign({ id: 3, nome: 'Visitante', email: 'v@teste.com', perfil: 'VISITANTE' }, JWT_SECRET, { expiresIn: '1h' });
+    // O ADMIN edita o catálogo-modelo (os pilotos criados aqui são do catálogo)
+    admin = await criarAdmin(app);
+    tokenAdmin = admin.token;
     const equipes = await request(app).get('/api/equipes');
     equipeId = equipes.body.dados[0].id;
   });
 
   afterAll(async () => {
     if (criados.length) await db.query('DELETE FROM pilotos WHERE id IN (?)', [criados]);
+    await removerUsuarios([admin && admin.id]);
     await db.end();
   });
 
@@ -134,11 +132,11 @@ describe('API de pilotos', () => {
     expect(adulterado.status).toBe(401);
   });
 
-  it('4. Bloqueia perfil sem permissão (403) em POST, PUT e DELETE', async () => {
-    const post = await request(app).post('/api/pilotos').set(auth(tokenSemPermissao)).send(pilotoValido());
-    const put = await request(app).put('/api/pilotos/1').set(auth(tokenSemPermissao)).send({ salario_anual: 1 });
-    const del = await request(app).delete('/api/pilotos/1').set(auth(tokenSemPermissao));
-    expect([post.status, put.status, del.status]).toEqual([403, 403, 403]);
+  it('4. Bloqueia perfil sem permissão: ADMIN não usa a rota exclusiva de MANAGER (403) e visitante recebe 401', async () => {
+    const admin403 = await request(app).post('/api/pilotos/restaurar').set(auth(tokenAdmin));
+    expect(admin403.status).toBe(403);
+    const visitante = await request(app).post('/api/pilotos/restaurar');
+    expect(visitante.status).toBe(401);
   });
 
   it('5. Retorna 404 para piloto inexistente e 400 para identificador inválido', async () => {
@@ -162,7 +160,7 @@ describe('API de pilotos', () => {
 
   it('7. Edição parcial (PUT só com salário): altera o salário e preserva atributos e estrelas', async () => {
     const criado = (await criar()).body.dados;
-    const r = await request(app).put(`/api/pilotos/${criado.id}`).set(auth(tokenManager)).send({ salario_anual: 5555000 });
+    const r = await request(app).put(`/api/pilotos/${criado.id}`).set(auth(tokenAdmin)).send({ salario_anual: 5555000 });
     expect(r.status).toBe(200);
     expect(r.body.dados.salario_anual).toBe(5555000);
     expect(r.body.dados.atributos).toEqual(criado.atributos);

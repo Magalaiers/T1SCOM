@@ -8,6 +8,7 @@ const fs = require('fs');
 const path = require('path');
 const bcrypt = require('bcryptjs');
 const pool = require('./src/config/db');
+const pilotoRepo = require('./src/repositories/pilotoRepository');
 const { ATRIBUTOS, SERIES, calcularEstrelasAtuais } = require('./src/utils/validators');
 
 const COLUNAS_PILOTO = [
@@ -99,8 +100,15 @@ async function popularBancoDeDados() {
       await conexao.execute(sqlPiloto, montarLinhaPiloto(p));
     }
 
+    // Cada MANAGER já cadastrado recebe uma cópia pessoal do catálogo recém-criado
+    const [gerentes] = await conexao.query("SELECT id FROM usuarios WHERE perfil = 'MANAGER'");
+    for (const gerente of gerentes) {
+      await pilotoRepo.copiarCatalogoPara(gerente.id, conexao);
+    }
+
     await conexao.commit();
-    console.log(`[OK] Banco populado: ${dados.campeonatos.length} campeonatos, ${dados.equipes.length} equipes, ${dados.pilotos.length} pilotos.`);
+    console.log(`[OK] Banco populado: ${dados.campeonatos.length} campeonatos, ${dados.equipes.length} equipes, ${dados.pilotos.length} pilotos no catálogo-modelo.`);
+    console.log(`[OK] ${gerentes.length} usuário(s) MANAGER já cadastrado(s) receberam uma cópia do catálogo.`);
 
     await criarAdminInicial(conexao);
   } catch (erro) {

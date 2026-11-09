@@ -1,21 +1,16 @@
-const db = require('../config/db');
 const logger = require('../utils/logger');
 const { erro, erroValidacao, erroInterno, sucesso } = require('../utils/respostas');
 const {
   ATRIBUTOS, validarId, validarPiloto, mesclarPiloto, resolverEstrelas
 } = require('../utils/validators');
+const pilotoRepo = require('../repositories/pilotoRepository');
+const equipeRepo = require('../repositories/equipeRepository');
+const { comTransacao } = require('../repositories/transacao');
 
-const SELECT_PILOTO = `
-  SELECT p.*, e.nome AS nome_equipe, e.cor_primaria, e.cor_secundaria
-  FROM pilotos p
-  LEFT JOIN equipes e ON e.id = p.equipe_id
-`;
-
-const COLUNAS_ESCRITA = [
-  'nome', 'pais', 'idade', 'salario_anual', 'series_preference', 'pay_driver',
-  'marketability', 'status_contrato', 'equipe_id', ...ATRIBUTOS,
-  'estrelas_atuais', 'estrelas_potencial'
-];
+// De quem são os dados que esta requisição enxerga e altera:
+//  - MANAGER logado -> a cópia pessoal dele (dono = id do usuário)
+//  - ADMIN ou visitante -> o catálogo-modelo (dono = null)
+const donoDoEscopo = (req) => (req.usuario && req.usuario.perfil === 'MANAGER' ? req.usuario.id : null);
 
 const lerAtributos = (linha) => Object.fromEntries(ATRIBUTOS.map((c) => [c, linha[c]]));
 
@@ -60,25 +55,10 @@ function linhaParaDominio(linha) {
   };
 }
 
-const valoresParaGravar = (dados, estrelas) => {
-  const completo = { ...dados, ...estrelas, ...dados.atributos, pay_driver: dados.pay_driver ? 1 : 0 };
-  return COLUNAS_ESCRITA.map((coluna) => completo[coluna]);
-};
-
-async function buscarPorId(id) {
-  const [linhas] = await db.execute(`${SELECT_PILOTO} WHERE p.id = ?`, [id]);
-  return linhas[0] || null;
-}
-
-async function equipeExiste(id) {
-  const [linhas] = await db.execute('SELECT id FROM equipes WHERE id = ?', [id]);
-  return linhas.length > 0;
-}
-
 // GET /api/pilotos
 exports.listarPilotos = async (req, res) => {
   try {
-    const [linhas] = await db.query(`${SELECT_PILOTO} ORDER BY p.nome ASC`);
+    const linhas = await pilotoRepo.listar(donoDoEscopo(req));
     return sucesso(res, 200, { dados: linhas.map(linhaParaResposta) });
   } catch (excecao) {
     logger.error('PILOTOS', `Erro ao listar pilotos: ${excecao.message}`);
@@ -92,7 +72,7 @@ exports.obterPiloto = async (req, res) => {
   if (!id) return erro(res, 400, 'Identificador de piloto inválido.');
 
   try {
-    const linha = await buscarPorId(id);
+    const linha = await pilotoRepo.buscarPorId(id, donoDoEscopo(req));
     if (!linha) return erro(res, 404, 'Piloto não encontrado.');
     return sucesso(res, 200, { dados: linhaParaResposta(linha) });
   } catch (excecao) {
@@ -107,19 +87,16 @@ exports.criarPiloto = async (req, res) => {
   if (!valido) return erroValidacao(res, erros);
 
   try {
-    if (dados.equipe_id !== null && !(await equipeExiste(dados.equipe_id))) {
+    if (dados.equipe_id !== null && !(await equipeRepo.existe(dados.equipe_id))) {
       return erroValidacao(res, [{ campo: 'equipe_id', mensagem: 'A equipe informada não existe.' }]);
     }
 
+    const donoId = donoDoEscopo(req);
     const estrelas = resolverEstrelas(dados, null);
-    const marcadores = COLUNAS_ESCRITA.map(() => '?').join(', ');
-    const [resultado] = await db.execute(
-      `INSERT INTO pilotos (${COLUNAS_ESCRITA.join(', ')}) VALUES (${marcadores})`,
-      valoresParaGravar(dados, estrelas)
-    );
+    const novoId = await pilotoRepo.inserir(dados, estrelas, donoId);
 
-    logger.info('PILOTOS', `Piloto criado: ID ${resultado.insertId} por usuário ID ${req.usuario.id}`);
-    const criado = await buscarPorId(resultado.insertId);
+    logger.info('PILOTOS', `Piloto criado: ID ${novoId} por usuário ID ${req.usuario.id}`);
+    const criado = await pilotoRepo.buscarPorId(novoId, donoId);
     return sucesso(res, 201, { mensagem: 'Piloto criado com sucesso.', dados: linhaParaResposta(criado) });
   } catch (excecao) {
     logger.error('PILOTOS', `Erro ao criar piloto: ${excecao.message}`);
@@ -133,26 +110,24 @@ exports.atualizarPiloto = async (req, res) => {
   if (!id) return erro(res, 400, 'Identificador de piloto inválido.');
 
   try {
-    const linha = await buscarPorId(id);
+    const donoId = donoDoEscopo(req);
+    const linha = await pilotoRepo.buscarPorId(id, donoId);
     if (!linha) return erro(res, 404, 'Piloto não encontrado.');
 
     const existente = linhaParaDominio(linha);
     const { valido, erros, dados } = validarPiloto(mesclarPiloto(existente, req.body));
     if (!valido) return erroValidacao(res, erros);
 
-    if (dados.equipe_id !== null && !(await equipeExiste(dados.equipe_id))) {
+    if (dados.equipe_id !== null && !(await equipeRepo.existe(dados.equipe_id))) {
       return erroValidacao(res, [{ campo: 'equipe_id', mensagem: 'A equipe informada não existe.' }]);
     }
 
     const estrelas = resolverEstrelas(dados, existente);
-    const atribuicoes = COLUNAS_ESCRITA.map((coluna) => `${coluna} = ?`).join(', ');
-    await db.execute(
-      `UPDATE pilotos SET ${atribuicoes} WHERE id = ?`,
-      [...valoresParaGravar(dados, estrelas), id]
-    );
+    const gravado = await pilotoRepo.atualizar(id, donoId, dados, estrelas);
+    if (!gravado) return erro(res, 404, 'Piloto não encontrado.');
 
     logger.info('PILOTOS', `Piloto ID ${id} atualizado por usuário ID ${req.usuario.id}`);
-    const atualizado = await buscarPorId(id);
+    const atualizado = await pilotoRepo.buscarPorId(id, donoId);
     return sucesso(res, 200, { mensagem: 'Piloto atualizado com sucesso.', dados: linhaParaResposta(atualizado) });
   } catch (excecao) {
     logger.error('PILOTOS', `Erro ao atualizar piloto ${id}: ${excecao.message}`);
@@ -166,13 +141,31 @@ exports.deletarPiloto = async (req, res) => {
   if (!id) return erro(res, 400, 'Identificador de piloto inválido.');
 
   try {
-    const [resultado] = await db.execute('DELETE FROM pilotos WHERE id = ?', [id]);
-    if (resultado.affectedRows === 0) return erro(res, 404, 'Piloto não encontrado.');
+    const removido = await pilotoRepo.excluir(id, donoDoEscopo(req));
+    if (!removido) return erro(res, 404, 'Piloto não encontrado.');
 
     logger.info('PILOTOS', `Piloto ID ${id} removido por usuário ID ${req.usuario.id}`);
     return sucesso(res, 200, { mensagem: 'Registro do piloto removido definitivamente.' });
   } catch (excecao) {
     logger.error('PILOTOS', `Erro ao deletar piloto ${id}: ${excecao.message}`);
     return erroInterno(res, excecao);
+  }
+};
+
+// POST /api/pilotos/restaurar  (só MANAGER)
+// Apaga a cópia pessoal do usuário e recebe uma nova do catálogo-modelo, de forma atômica.
+exports.restaurarPilotos = async (req, res) => {
+  const donoId = req.usuario.id;
+  try {
+    const total = await comTransacao(async (conexao) => {
+      await pilotoRepo.excluirTodosDoDono(donoId, conexao);
+      return pilotoRepo.copiarCatalogoPara(donoId, conexao);
+    });
+
+    logger.info('PILOTOS', `Dados restaurados para o usuário ID ${donoId}: ${total} pilotos copiados do catálogo`);
+    return sucesso(res, 200, { mensagem: 'Seus pilotos foram restaurados a partir do catálogo-modelo.', dados: { total } });
+  } catch (excecao) {
+    logger.error('PILOTOS', `Erro ao restaurar dados do usuário ${donoId}: ${excecao.message}`);
+    return erroInterno(res, excecao, 'Erro ao restaurar os dados.');
   }
 };
