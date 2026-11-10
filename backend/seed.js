@@ -11,6 +11,35 @@ const pool = require('./src/config/db');
 const pilotoRepo = require('./src/repositories/pilotoRepository');
 const { ATRIBUTOS, SERIES, calcularEstrelasAtuais } = require('./src/utils/validators');
 
+// O Teams.csv do jogo NÃO informa o campeonato de cada equipe (o conversor do Trabalho 1 gravava todas no
+// campeonato 1). Essa informação está na ORDEM das equipes no arquivo: elas vêm em blocos consecutivos, um por
+// campeonato. Duas conferências nos dados do jogo sustentam essa leitura:
+//  1) dentro de cada tipo de série, a habilidade e o salário médios dos pilotos caem de um bloco para o seguinte
+//     (Single Seater: 14,9 -> 11,2 -> 8,3 | GT: 13,0 -> 10,3 | Endurance: 13,4 -> 10,9);
+//  2) as 12 equipes de 6 pilotos são exatamente os dois últimos blocos (as de Endurance).
+// O resultado foi conferido equipe por equipe com a tabela de equipes por campeonato do jogo (62 de 62) e o teste K3
+// (tests/campeonatos.test.js) o trava. Cada item abaixo é um bloco, na ordem do arquivo: `campeonato` é o id em
+// dados.campeonatos e `equipes` é quantas equipes o bloco tem.
+const BLOCOS_DE_EQUIPES = [
+  { campeonato: 1, equipes: 10 }, // World Motorsport Championship (Single Seater, Tier 1)
+  { campeonato: 2, equipes: 10 }, // Asia-Pacific Super Cup (Single Seater, Tier 2)
+  { campeonato: 3, equipes: 10 }, // European Racing Series (Single Seater, Tier 3)
+  { campeonato: 4, equipes: 10 }, // International GT Championship (GT, Tier 1)
+  { campeonato: 5, equipes: 10 }, // GT Challenger Series (GT, Tier 2)
+  { campeonato: 6, equipes: 6 },  // International Endurance Cup, Class A (Endurance, Tier 1)
+  { campeonato: 7, equipes: 6 }   // International Endurance Cup, Class B (Endurance, Tier 2)
+];
+
+// Id do campeonato da equipe na posição `indice` (0 = primeira equipe do arquivo)
+function campeonatoDaPosicao(indice) {
+  let restante = indice;
+  for (const bloco of BLOCOS_DE_EQUIPES) {
+    if (restante < bloco.equipes) return bloco.campeonato;
+    restante -= bloco.equipes;
+  }
+  throw new Error(`Equipe na posição ${indice} sem campeonato: confira BLOCOS_DE_EQUIPES.`);
+}
+
 const COLUNAS_PILOTO = [
   'id', 'nome', 'pais', 'idade', 'salario_anual', 'series_preference', 'pay_driver',
   'marketability', 'status_contrato', 'equipe_id', ...ATRIBUTOS,
@@ -71,6 +100,12 @@ async function popularBancoDeDados() {
   let conexao;
   try {
     const dados = JSON.parse(fs.readFileSync(path.join(__dirname, 'dados.json'), 'utf-8'));
+    const totalEsperado = BLOCOS_DE_EQUIPES.reduce((soma, bloco) => soma + bloco.equipes, 0);
+    const idsDosCampeonatos = new Set(dados.campeonatos.map((c) => c.id));
+    if (dados.equipes.length !== totalEsperado || BLOCOS_DE_EQUIPES.some((bloco) => !idsDosCampeonatos.has(bloco.campeonato))) {
+      throw new Error(`dados.json fora do esperado: ${dados.equipes.length} equipes (esperado ${totalEsperado}) ou campeonato inexistente. `
+        + 'Ajuste BLOCOS_DE_EQUIPES no seed.js.');
+    }
     conexao = await pool.getConnection();
 
     await conexao.query('SET FOREIGN_KEY_CHECKS = 0');
@@ -89,10 +124,11 @@ async function popularBancoDeDados() {
       );
     }
 
-    for (const e of dados.equipes) {
+    const equipesEmOrdem = [...dados.equipes].sort((a, b) => a.id - b.id);
+    for (const [indice, e] of equipesEmOrdem.entries()) {
       await conexao.execute(
         'INSERT INTO equipes (id, nome, pais, campeonato_id, cor_primaria, cor_secundaria) VALUES (?, ?, ?, ?, ?, ?)',
-        [e.id, e.nome, e.pais || 'Internacional', e.campeonato_id, e.cor_primaria || '#383e4d', e.cor_secundaria || '#ffffff']
+        [e.id, e.nome, e.pais || 'Internacional', campeonatoDaPosicao(indice), e.cor_primaria || '#383e4d', e.cor_secundaria || '#ffffff']
       );
     }
 
